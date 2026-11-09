@@ -1,0 +1,262 @@
+{
+  "dataset": "UCI SECOM (CC BY 4.0)",
+  "split": {
+    "method": "time-ordered; first 80% train, last 20% test",
+    "train_rows": 1253,
+    "test_rows": 314,
+    "train_fail": 87,
+    "test_fail": 17,
+    "train_fail_rate": 0.0694,
+    "test_fail_rate": 0.0541,
+    "validation": "last 20% of the training period, used for C, threshold and model choice",
+    "val_rows": 251,
+    "val_fail": 11,
+    "val_fail_rate": 0.0438
+  },
+  "features": 444,
+  "logreg_c_grid": [
+    {
+      "C": 0.0001,
+      "val_pr_auc": 0.0434
+    },
+    {
+      "C": 0.001,
+      "val_pr_auc": 0.0414
+    },
+    {
+      "C": 0.01,
+      "val_pr_auc": 0.0394
+    },
+    {
+      "C": 0.1,
+      "val_pr_auc": 0.0391
+    },
+    {
+      "C": 1.0,
+      "val_pr_auc": 0.0365
+    }
+  ],
+  "selected_model": "random_forest",
+  "selection_rule": "higher PR-AUC on the validation slice (test period not used)",
+  "baseline_all_pass": {
+    "description": "predict pass for every run",
+    "accuracy": 0.9459,
+    "precision": null,
+    "recall": 0.0,
+    "pr_auc": 0.0541,
+    "confusion": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 17,
+      "tn": 297
+    }
+  },
+  "models": {
+    "logreg": {
+      "params": {
+        "C": 0.0001,
+        "class_weight": "balanced",
+        "scaler": "StandardScaler (fit on train)"
+      },
+      "test": {
+        "threshold": 0.4621,
+        "pr_auc": 0.0936,
+        "roc_auc": 0.6621,
+        "precision": 0.1047,
+        "recall": 0.5294,
+        "f1": 0.1748,
+        "confusion": {
+          "tp": 9,
+          "fp": 77,
+          "fn": 8,
+          "tn": 220
+        },
+        "flagged": 86
+      },
+      "test_at_0.5": {
+        "threshold": 0.5,
+        "pr_auc": 0.0936,
+        "roc_auc": 0.6621,
+        "precision": 0.0952,
+        "recall": 0.1176,
+        "f1": 0.1053,
+        "confusion": {
+          "tp": 2,
+          "fp": 19,
+          "fn": 15,
+          "tn": 278
+        },
+        "flagged": 21
+      },
+      "val_pr_auc": 0.0434
+    },
+    "random_forest": {
+      "params": {
+        "n_estimators": 500,
+        "min_samples_leaf": 3,
+        "class_weight": "balanced_subsample"
+      },
+      "test": {
+        "threshold": 0.074,
+        "pr_auc": 0.0725,
+        "roc_auc": 0.5357,
+        "precision": 0.0748,
+        "recall": 0.6471,
+        "f1": 0.1341,
+        "confusion": {
+          "tp": 11,
+          "fp": 136,
+          "fn": 6,
+          "tn": 161
+        },
+        "flagged": 147
+      },
+      "test_at_0.5": {
+        "threshold": 0.5,
+        "pr_auc": 0.0725,
+        "roc_auc": 0.5357,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "confusion": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 17,
+          "tn": 297
+        },
+        "flagged": 0
+      },
+      "val_pr_auc": 0.0576
+    }
+  },
+  "permutation_importance": {
+    "scoring": "average_precision (PR-AUC) on the test period",
+    "n_repeats": 20,
+    "top10": {
+      "logreg": [
+        {
+          "rank": 1,
+          "sensor": "s348",
+          "importance_mean": 0.0083,
+          "importance_std": 0.0011
+        },
+        {
+          "rank": 2,
+          "sensor": "s103",
+          "importance_mean": 0.0061,
+          "importance_std": 0.0013
+        },
+        {
+          "rank": 3,
+          "sensor": "s124",
+          "importance_mean": 0.0053,
+          "importance_std": 0.0009
+        },
+        {
+          "rank": 4,
+          "sensor": "s121",
+          "importance_mean": 0.0051,
+          "importance_std": 0.0008
+        },
+        {
+          "rank": 5,
+          "sensor": "s210",
+          "importance_mean": 0.005,
+          "importance_std": 0.0009
+        },
+        {
+          "rank": 6,
+          "sensor": "s510",
+          "importance_mean": 0.0046,
+          "importance_std": 0.0012
+        },
+        {
+          "rank": 7,
+          "sensor": "s133",
+          "importance_mean": 0.0039,
+          "importance_std": 0.0011
+        },
+        {
+          "rank": 8,
+          "sensor": "s123",
+          "importance_mean": 0.0039,
+          "importance_std": 0.0009
+        },
+        {
+          "rank": 9,
+          "sensor": "s056",
+          "importance_mean": 0.0038,
+          "importance_std": 0.0012
+        },
+        {
+          "rank": 10,
+          "sensor": "s130",
+          "importance_mean": 0.0032,
+          "importance_std": 0.0016
+        }
+      ],
+      "random_forest": [
+        {
+          "rank": 1,
+          "sensor": "s103",
+          "importance_mean": 0.0044,
+          "importance_std": 0.0016
+        },
+        {
+          "rank": 2,
+          "sensor": "s035",
+          "importance_mean": 0.0029,
+          "importance_std": 0.0017
+        },
+        {
+          "rank": 3,
+          "sensor": "s510",
+          "importance_mean": 0.0026,
+          "importance_std": 0.0011
+        },
+        {
+          "rank": 4,
+          "sensor": "s573",
+          "importance_mean": 0.0022,
+          "importance_std": 0.0014
+        },
+        {
+          "rank": 5,
+          "sensor": "s102",
+          "importance_mean": 0.0018,
+          "importance_std": 0.0012
+        },
+        {
+          "rank": 6,
+          "sensor": "s019",
+          "importance_mean": 0.0017,
+          "importance_std": 0.0014
+        },
+        {
+          "rank": 7,
+          "sensor": "s068",
+          "importance_mean": 0.0016,
+          "importance_std": 0.0009
+        },
+        {
+          "rank": 8,
+          "sensor": "s454",
+          "importance_mean": 0.0014,
+          "importance_std": 0.0015
+        },
+        {
+          "rank": 9,
+          "sensor": "s033",
+          "importance_mean": 0.0013,
+          "importance_std": 0.0021
+        },
+        {
+          "rank": 10,
+          "sensor": "s348",
+          "importance_mean": 0.0013,
+          "importance_std": 0.001
+        }
+      ]
+    }
+  }
+}

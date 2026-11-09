@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/raw/
+data/processed/
+data/*.db
+data/*.db-journal
+.env
+.env.*
+# Raw Claude Code stream-json from scripts/run_demo.sh: carries cwd and session context.
+demo/*.jsonl
+# In-progress transcript, promoted to transcript.md only after the leak scan passes.
+demo/transcript.md.tmp

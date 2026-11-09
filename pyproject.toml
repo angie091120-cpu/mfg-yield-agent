@@ -1,0 +1,21 @@
+[project]
+name = "mfg-yield-agent"
+version = "0.1.0"
+description = "Yield anomaly analysis on UCI SECOM: cleaning pipeline, SQLite, baseline models, MCP server for an agent"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0,<3",
+    "pandas>=2.2,<4",
+    "scikit-learn>=1.5,<2",
+    "mcp>=2.3,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+# Not an installable package: install with  pip install -r requirements.txt  (pinned versions;
+# metrics.json was produced with exactly these).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

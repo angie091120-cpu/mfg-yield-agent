@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mfg-yield": {
+      "command": ".venv/bin/python",
+      "args": ["mcp/server.py"],
+      "env": {
+        "MFG_DB": "data/secom.db"
+      }
+    }
+  }
+}
