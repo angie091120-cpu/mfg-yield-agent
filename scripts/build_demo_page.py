@@ -250,14 +250,36 @@ def chunks(parts: list[str]) -> str:
     return "<wbr>".join(f'<span class="nb">{p}</span>' for p in parts)
 
 
+# Word-boundary source of truth. Every BREAK ("¦") written in a prose template must sit between two words from
+# BREAK_WORDS (multi-character words) or BREAK_SINGLES (one-character function words and counters); tests/test_demo_page.py
+# checks each <wbr> in the page against these two lists and rejects a break that cuts a listed word in two.
+BREAK = "¦"
+BREAK_WORDS = (
+    "下面 數字 取自 資料庫 重播 不代表 原因 不是 各站 加工 時間 不良組 不良 中位數 不證明 因果 亂猜 等於 不良率 以後 最低 "
+    "測試期 邏輯迴歸 依序 點開 請求 回應 先看 結論 兩個 模型 各自 排出 平均值 其中 樣本 最少 一週 只有 半導體 製程 資料集 "
+    "給得出 感測欄 編號 只能 排查 順序 參考 透過 右緣 陰影 代表 還有 呼叫 外部 工具 通訊 規則 事先 寫死 筆記 內文 都是 就是 "
+    "就能 直接 繞過 閘門 工具層 成立 匿名 感測欄名 檔案 回答 不了 回報 這次 有沒有 出錯 欄位 打亂 誤差 很大 掉了 多少 排名 "
+    "這些欄 和不良 一起 變動 相關 方框 長行 可以 左右 滑動 完整 內容 時間戳 測試 衍生 結果 標準化 平均差 效果 只比 每個點 "
+    "標的 沒有 執行 站別 語言模型 參與 驗證 比隨機 挑欄 滑鼠 移上去 看筆數 指定 標準差 單位 作業 說明檔 原樣 輸出 調查 "
+    "不小於 平均 兩邊 不等於 不良品 抓得 準不準 分數 確認 步驟 草稿 紀錄 產生於 下指令 終端機 自己 查資料 程式 若同時 "
+    "到現場 規定 查詢 硬塞 越大 可疑 全期 不可靠 拿來 自動 判退 腳本 這段 這是 一個 這個 週次 從週一 起算 這一步 本身 "
+    "就不穩 選模型 隨機森林 頁面 驗證段 重要度 訓練報告 實際回傳 資料 算出 表中 該欄 一週 還有 衍生 這些 只在 隨機 挑欄 "
+    "當單位 內的 由這份 由腳本 要由 兩組 兩邊 都進 錯誤 順序 說明 檔案 平均值 規則 事先 筆數 "
+    "不能 亂猜 以前 只含 重疊 定好 指標 所以 更低 本頁 橘底 每步 清成 良品組 良品 良率 連到 選到 可疑"
+).split()
+BREAK_SINGLES = "的是與和或把值當差好看抓改等做人前到年有在由照用加比也都就能但它比個名筆週欄步查帶後這那些各只時第碰回越過含"
+
+
 def apply_wbr(html: str) -> str:
-    """Turn the '|' word-boundary markers in prose into <wbr>. With word-break:keep-all a CJK line can only
-    break at punctuation, spaces or these marks, so a word is never split. <pre>, <style>, <script> stay untouched."""
+    """Turn the BREAK markers the templates wrote into <wbr>. With word-break:keep-all a CJK line can only break at
+    punctuation, spaces or these marks, so a word is never split. Only text between tags is touched: <pre>, <style>,
+    <script> and attribute values stay as they are, and values from the sources never carry the marker (see build())."""
     parts = re.split(r"(<pre\b.*?</pre>|<style>.*?</style>|<script\b.*?</script>)", html, flags=re.S)
+
     def prose(p: str) -> str:
-        p = p.replace("|", "<wbr>")
-        # a number and its unit are one word: keep them on one line (never inside a tag's attributes)
-        return re.sub(r"((?:第 )?\d+(?: 到 \d+)? (?:週|筆|欄|個|名|步))(?![^<]*>)", r'<span class="nb">\1</span>', p)
+        p = "".join(t if t.startswith("<") else t.replace(BREAK, "<wbr>") for t in re.split(r"(<[^>]*>)", p))
+        # a number and its unit are one word, and so is "前 N 名": keep each on one line (never inside a tag's attributes)
+        return re.sub(r"((?:第 )?\d+(?: 到 \d+)? (?:週|筆|欄|個|名|步)|前 \d+(?: 名)?)(?![^<]*>)", r'<span class="nb">\1</span>', p)
 
     return "".join(p if i % 2 else prose(p) for i, p in enumerate(parts))
 
@@ -325,15 +347,15 @@ def replay_items(calls: list[dict], low: dict) -> list[dict]:
     lw = next(w for w in yb["response"]["weeks"] if w["week"] == low["week"])
     r = yb["request"]
     items = [
-        (yb, f"查 {r['start']} 到 {r['end']}；W{week_no(lw['week'])} {lw['runs']} 筆、{lw['fails']} 筆|不良，良率 {lw['yield_pct']}%"),
+        (yb, f"查 {r['start']} 到 {r['end']}；W{week_no(lw['week'])} {lw['runs']} 筆、{lw['fails']} 筆¦不良，良率 {lw['yield_pct']}%"),
         (ts, f"取前 {ts['request']['n']} 名；第 1 名 {ts['response']['sensors'][0]['sensor']}，重要度 {ts['response']['sensors'][0]['importance_mean']}"),
-        (c103, f"{c103['request']['sensor']}：不良組|中位數 {c103['response']['fail']['median']}，良品組|中位數 {c103['response']['pass']['median']}；"
-               f"標準化|平均差 {c103['response']['std_mean_diff_fail_minus_pass']}（兩組|平均值|的差，用|標準差|當單位）"),
-        (c035, f"{c035['request']['sensor']}：不良組|中位數 {c035['response']['fail']['median']}，良品組|中位數 {c035['response']['pass']['median']}；"
-               f"標準化|平均差 {c035['response']['std_mean_diff_fail_minus_pass']}"),
-        (note, f"寫入 {note['request']['sensor']} 的|調查|筆記，回應 status = {note['response']['status']}"),
-        (gate, f"請求|硬塞 status: {gate['request']['status']}，回應的 status 仍是 {gate['response']['status']}"),
-        (inj, "感測欄名|帶 SQL 片段，工具|回錯誤（isError=true），沒有|執行"),
+        (c103, f"{c103['request']['sensor']}：不良組¦中位數 {c103['response']['fail']['median']}，良品組¦中位數 {c103['response']['pass']['median']}；"
+               f"標準化¦平均差 {c103['response']['std_mean_diff_fail_minus_pass']}（兩組¦平均值¦的差，用¦標準差¦當單位）"),
+        (c035, f"{c035['request']['sensor']}：不良組¦中位數 {c035['response']['fail']['median']}，良品組¦中位數 {c035['response']['pass']['median']}；"
+               f"標準化¦平均差 {c035['response']['std_mean_diff_fail_minus_pass']}"),
+        (note, f"寫入 {note['request']['sensor']} 的¦調查¦筆記，回應 status = {note['response']['status']}"),
+        (gate, f"請求¦硬塞 status: {gate['request']['status']}，回應的 status 仍是 {gate['response']['status']}"),
+        (inj, "感測欄名¦帶 SQL 片段，工具¦回錯誤（isError=true），沒有¦執行"),
     ]
     assert gate["request"].get("status") == "confirmed" and gate["response"]["status"] == "draft"
     assert inj["is_error"] and not any(c["is_error"] for c in by[:6])
@@ -409,51 +431,51 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 
 <section class="hero" aria-labelledby="h-hero">
 <h1 id="h-hero">{h1}</h1>
-<p>這是一個|良率查詢 Agent（讓 AI 照指定順序|呼叫工具、自己|查資料|的程式），查的是 UCI 公開的 SECOM 半導體|製程|資料集。它透過 MCP（讓 AI 呼叫|外部工具|的通訊規則）連到|資料庫。下面的|數字|取自|資料庫、訓練報告|與工具的|實際回傳。</p>
+<p>這是一個¦良率查詢 Agent（讓 AI 照指定順序¦呼叫工具、自己¦查資料¦的程式），查的是 UCI 公開的 SECOM 半導體¦製程¦資料集。它透過 MCP（讓 AI 呼叫¦外部工具¦的通訊規則）連到¦資料庫。下面的¦數字¦取自¦資料庫、訓練報告¦與工具的¦實際回傳。</p>
 <p class="links"><a href="{REPO_URL}">原始碼（GitHub）</a></p>
 </section>
 
 <section class="zone" aria-labelledby="h-yield">
 <h2 id="h-yield">每週良率</h2>
-<p class="lede">2008 年|第 {week_no(w0)} 到 {week_no(w1)} 週，每個點|是一週（週次|從週一|起算，不是 ISO 週次），滑鼠|移上去|看筆數。第 {RANGE_START_WEEK} 週|以後|最低的|是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆|不良，良率 {fmt_pct(low['yield_pct'])}。</p>
-<p class="lede">這不是|全期|最低。第 {RANGE_START_WEEK} 週|以前有 {data['earlier_lower_weeks']} 週|更低，其中|樣本|最少的|一週|只有 {data['earlier_min_runs']} 筆。下面的|重播|查的是|第 {r0} 到 {r1} 週。</p>
+<p class="lede">2008 年¦第 {week_no(w0)} 到 {week_no(w1)} 週，每個點¦是一週（週次¦從週一¦起算，不是 ISO 週次），滑鼠¦移上去¦看筆數。第 {RANGE_START_WEEK} 週¦以後¦最低的¦是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆¦不良，良率 {fmt_pct(low['yield_pct'])}。</p>
+<p class="lede">這不是¦全期¦最低。第 {RANGE_START_WEEK} 週¦以前有 {data['earlier_lower_weeks']} 週¦更低，其中¦樣本¦最少的¦一週¦只有 {data['earlier_min_runs']} 筆。下面的¦重播¦查的是¦第 {r0} 到 {r1} 週。</p>
 {chart(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-sensors">
 <h2 id="h-sensors">可疑感測欄前 10 名</h2>
-<p class="lede">兩個|模型|各自|排出|前 10。表中的|數字|是|重要度：把|該欄的|值|打亂後，PR-AUC（看|模型|抓|不良品|抓得|準不準|的分數，亂猜時|等於|不良率）掉了|多少，越大|越可疑。</p>
-<p class="lede">橘底|加 <span class="mk">◆</span> 的是|兩邊|都進|前 10 的 {len(data['both'])} 欄：{both}。排名|只代表|這些欄|和不良|一起|變動，不代表|原因。隨機森林|有 {len(data['rf_noisy'])} 欄（{noisy}）的|標準差|不小於|平均，這些|排名|不可靠。</p>
+<p class="lede">兩個¦模型¦各自¦排出¦前 10。表中的¦數字¦是¦重要度：把¦該欄的¦值¦打亂後，PR-AUC（看¦模型¦抓¦不良品¦抓得¦準不準¦的分數，亂猜時¦等於¦不良率）掉了¦多少，越大¦越可疑。</p>
+<p class="lede">橘底¦加 <span class="mk">◆</span> 的是¦兩邊¦都進¦前 10 的 {len(data['both'])} 欄：{both}。排名¦只代表¦這些欄¦和不良¦一起¦變動，不代表¦原因。隨機森林¦有 {len(data['rf_noisy'])} 欄（{noisy}）的¦標準差¦不小於¦平均，這些¦排名¦不可靠。</p>
 {sensor_table(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-replay">
 <h2 id="h-replay">Agent 查詢重播</h2>
-<p class="lede">依序|點開|看請求|與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的|原樣|輸出（紀錄|產生於 {sess_date}）。這段|由腳本|照 skill（寫給 AI 的|作業|說明檔，規定|查詢|步驟）的|順序|呼叫 MCP 伺服器，沒有|語言模型|參與；每步|回應|標的 isError 是|工具|回報|這次|有沒有|出錯|的欄位；呼叫|順序|與|筆記|內文|都是|事先|寫死的。</p>
-<p class="hint">第 1 步已展開。方框內的長行|可以|左右滑動|看完整內容，右緣|有陰影|就代表|還有。</p>
+<p class="lede">依序¦點開¦看請求¦與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的¦原樣¦輸出（紀錄¦產生於 {sess_date}）。這段¦由腳本¦照 skill（寫給 AI 的¦作業¦說明檔，規定¦查詢¦步驟）的¦順序¦呼叫 MCP 伺服器，沒有¦語言模型¦參與；每步¦回應¦標的 isError 是¦工具¦回報¦這次¦有沒有¦出錯¦的欄位；呼叫¦順序¦與¦筆記¦內文¦都是¦事先¦寫死的。</p>
+<p class="hint">第 1 步已展開。方框內的長行¦可以¦左右滑動¦看完整內容，右緣¦有陰影¦就代表¦還有。</p>
 {replay_html(items)}
 </section>
 
 <section class="zone" aria-labelledby="h-limits">
 <h2 id="h-limits">限制與誠實聲明</h2>
-<p class="lede">先看|結論：模型的|效果|只比|「全猜良品」|高一點，排名|只是|相關，不證明|因果。</p>
+<p class="lede">先看¦結論：模型的¦效果¦只比¦「全猜良品」¦高一點，排名¦只是¦相關，不證明¦因果。</p>
 <div class="cards">
-<div class="card wide"><h3>模型|只比|「全猜良品」|高一點</h3>
-<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆|不良。全猜良品的 PR-AUC 就是|不良率 {mdl['baseline']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}。</p>
+<div class="card wide"><h3>模型¦只比¦「全猜良品」¦高一點</h3>
+<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆¦不良。全猜良品的 PR-AUC 就是¦不良率 {mdl['baseline']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}。</p>
 {models_table(data)}
-<p class="after">隨機森林的 ROC-AUC 是 {mdl['random_forest']['roc_auc']}（0.5 等於|亂猜），這個|模型|不能|拿來|當|自動|判退的|閘門。驗證段|只有 {sp['val_fail']} 筆|不良，選模型|這一步|本身|就不穩：照|事先|定好的|規則|選到|隨機森林，但在|測試期|它比|邏輯迴歸|差。測試期|只有 {sp['test_fail']} 筆|不良，指標的|誤差|很大。</p></div>
-<div class="card"><h3>相關|不等於|因果</h3>
-<p>前 10 名|只能|當|排查|順序的|參考，沒有|驗證過|比隨機|挑欄|好，兩個|模型的|前 10 名|只重疊 {len(data['both'])} 欄。</p>
-<p>感測欄|是匿名的，沒有|站別、機台、批號，所以|回答不了|「哪個站」，只給得出|感測欄|編號。時間戳|是測試|時間，不是|各站的|加工|時間。</p></div>
-<div class="card"><h3>筆記|只能是|草稿</h3>
-<p>draft 閘門|只在 MCP 工具層|成立，前提是 Agent 只能|透過|這 {c['tools']} 個|工具|碰資料庫。Agent 若同時|有 shell（能|直接|下指令|的終端機）或|檔案|工具，就能|直接|改|資料庫|繞過|閘門。</p>
-<p>確認|筆記的|步驟|沒有做，要由|人|到現場|確認。</p></div>
+<p class="after">隨機森林的 ROC-AUC 是 {mdl['random_forest']['roc_auc']}（0.5 等於¦亂猜），這個¦模型¦不能¦拿來¦當¦自動¦判退的¦閘門。驗證段¦只有 {sp['val_fail']} 筆¦不良，選模型¦這一步¦本身¦就不穩：照¦事先¦定好的¦規則¦選到¦隨機森林，但在¦測試期¦它比¦邏輯迴歸¦差。測試期¦只有 {sp['test_fail']} 筆¦不良，指標的¦誤差¦很大。</p></div>
+<div class="card"><h3>相關¦不等於¦因果</h3>
+<p>前 10 名¦只能¦當¦排查¦順序的¦參考，沒有¦驗證過¦比隨機¦挑欄¦好，兩個¦模型的¦前 10 名¦只重疊 {len(data['both'])} 欄。</p>
+<p>感測欄¦是匿名的，沒有¦站別、機台、批號，所以¦回答不了¦「哪個站」，只給得出¦感測欄¦編號。時間戳¦是測試¦時間，不是¦各站的¦加工¦時間。</p></div>
+<div class="card"><h3>筆記¦只能是¦草稿</h3>
+<p>draft 閘門¦只在 MCP 工具層¦成立，前提是 Agent 只能¦透過¦這 {c['tools']} 個¦工具¦碰資料庫。Agent 若同時¦有 shell（能¦直接¦下指令¦的終端機）或¦檔案¦工具，就能¦直接¦改¦資料庫¦繞過¦閘門。</p>
+<p>確認¦筆記的¦步驟¦沒有做，要由¦人¦到現場¦確認。</p></div>
 </div>
 </section>
 
 <footer>
-<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="{UCI_URL}">doi:10.24432/C54305</a>，授權 <a href="{LICENSE_URL}">CC BY 4.0</a>。本頁|只含|由這份|資料|算出的|衍生|結果。</p>
-<p>頁面|由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫|與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="{REPO_URL}">原始碼（GitHub）</a></p>
+<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="{UCI_URL}">doi:10.24432/C54305</a>，授權 <a href="{LICENSE_URL}">CC BY 4.0</a>。本頁¦只含¦由這份¦資料¦算出的¦衍生¦結果。</p>
+<p>頁面¦由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫¦與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="{REPO_URL}">原始碼（GitHub）</a></p>
 </footer>
 </main>
 <script type="application/json" id="demo-data">{blob}</script>
@@ -466,6 +488,9 @@ def build() -> str:
     src = read_sources()
     calls = parse_session(src["session"])
     data = build_data(src, calls)
+    # the break marker belongs to the templates only: a value from the sources must never contain it
+    assert BREAK not in json.dumps(data, ensure_ascii=False) + src["session"] + json.dumps(src["metrics"], ensure_ascii=False), \
+        "a source value contains the word-break marker"
     items = replay_items(calls, data["low_week"])
     return apply_wbr(render(data, items, session_date(src["session"])))
 

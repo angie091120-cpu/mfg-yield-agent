@@ -11,6 +11,7 @@ import json
 import re
 import sqlite3
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -391,10 +392,86 @@ def _css() -> str:
     return re.search(r"<style>(.*?)</style>", PAGE_RAW, re.S).group(1)
 
 
+class _BlockCollector(HTMLParser):
+    """Collects the text of every text block outside <pre>/<script>/<style>, with each <wbr> kept as a token.
+
+    A block is p, h1-h4, li, th, td, header, footer or span.sum. Inline tags stay inside their block; b, small and
+    spans that are not part of a sentence (anything but nb/n/mk/mono) separate two runs, and a nested block
+    starts a new run, so unrelated text is never glued into one."""
+
+    BLOCKS = {"p", "h1", "h2", "h3", "h4", "li", "th", "td", "header", "footer"}
+    SKIP = {"pre", "script", "style"}
+    VOID = {"meta", "link", "wbr", "br", "line", "polyline", "path", "circle", "rect", "img"}
+    INLINE_OK = {"nb", "n", "mk", "mono"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.blocks: list[list[str]] = []
+        self.stack: list[tuple[str, int | None, bool]] = []  # (tag, block index or None, separates runs)
+        self.skip = 0
+
+    def _cur(self) -> list[str] | None:
+        for _, idx, _s in reversed(self.stack):
+            if idx is not None:
+                return self.blocks[idx]
+        return None
+
+    def _sep(self) -> None:
+        cur = self._cur()
+        if cur is not None:
+            cur.append("\n")
+
+    def handle_starttag(self, tag, attrs):
+        cls = dict(attrs).get("class") or ""
+        if tag in self.SKIP:
+            self.skip += 1
+        if self.skip:
+            if tag not in self.VOID:
+                self.stack.append((tag, None, False))
+            return
+        if tag == "wbr":
+            cur = self._cur()
+            if cur is not None:
+                cur.append("<wbr>")
+            return
+        if tag in self.VOID:
+            return
+        if tag in self.BLOCKS or (tag == "span" and "sum" in cls.split()):
+            self._sep()
+            self.blocks.append([])
+            self.stack.append((tag, len(self.blocks) - 1, False))
+            return
+        separates = tag in {"b", "small"} or (tag == "span" and not set(cls.split()) & self.INLINE_OK)
+        if separates:
+            self._sep()
+        self.stack.append((tag, None, separates))
+
+    def handle_endtag(self, tag):
+        if tag in self.VOID:
+            return
+        while self.stack:
+            t, idx, separates = self.stack.pop()
+            if t in self.SKIP:
+                self.skip -= 1
+            if idx is not None or separates:
+                self._sep()
+            if t == tag:
+                break
+
+    def handle_data(self, data):
+        if self.skip:
+            return
+        cur = self._cur()
+        if cur is not None:
+            cur.append(data)
+
+
 def _prose_blocks() -> list[str]:
-    """Inner HTML of every text block outside <pre>: paragraphs, headings, summaries."""
-    body = re.sub(r"<(pre|script|style)\b.*?</\1>", " ", PAGE_RAW, flags=re.S)
-    return re.findall(r"<(?:p|h1|h2|h3|span class=\"sum\")\b[^>]*>(.*?)</(?:p|h1|h2|h3|span)>", body, re.S)
+    """Text of every block on the page (<wbr> kept as a token): p, headings, li (incl. li.sep), th, td, header, footer, span.sum."""
+    c = _BlockCollector()
+    c.feed(PAGE_RAW)
+    c.close()
+    return ["".join(b) for b in c.blocks if "".join(b).strip()]
 
 
 def test_body_uses_keep_all_so_cjk_only_breaks_at_marked_places():
@@ -403,21 +480,83 @@ def test_body_uses_keep_all_so_cjk_only_breaks_at_marked_places():
     assert "overflow-wrap:break-word" in body_rule  # a too-long run still wraps instead of widening the page
 
 
+def test_page_text_collector_reaches_every_kind_of_block():
+    """M1: the scan must include li.sep, th, td, header and the summary spans, with nested inline tags kept whole."""
+    blocks = _prose_blocks()
+    assert len(blocks) >= 40
+    joined = "\n".join(blocks)
+    for probe in ("下面兩步是閘門測試", "名次", "隨機森林", "兩模型都選到", "作品展示・唯讀", "不良組", "原始碼（GitHub）", "取前"):
+        assert probe in joined.replace("<wbr>", ""), probe
+    # a summary containing an inner span is collected whole, not cut at the first </span>
+    assert any(b.startswith("取") and "名；第" in b and "重要度" in b for b in blocks)
+
+
 def test_no_marked_break_falls_inside_a_word():
-    terms = ["良率", "感測欄", "半導體", "製程", "資料集", "不良", "良品", "閘門", "邏輯迴歸", "隨機森林", "重要度",
-             "中位數", "標準差", "平均差", "語言模型", "資料庫", "工具", "筆記", "因果", "測試期", "驗證段", "全猜良品"]
-    for t in terms:
-        for i in range(1, len(t)):
-            assert t[:i] + "<wbr>" + t[i:] not in PAGE_RAW, f"<wbr> splits the word {t}"
+    """M2: every <wbr> sits on a word boundary of the generator's dictionary (BREAK_WORDS + BREAK_SINGLES).
+
+    Each piece between two breaks must be fully made of listed words, and two one-character entries may not be the halves of a listed word,
+    so a break cut into a word such as 模|型 (or one inside a word nobody thought to list) fails."""
+    b = _builder()
+    words = sorted(set(b.BREAK_WORDS), key=len, reverse=True)
+    singles = set(b.BREAK_SINGLES)
+
+    def segmentable(piece: str) -> bool:
+        ok = [True] + [False] * len(piece)
+        for i in range(len(piece)):
+            if ok[i]:
+                if piece[i] in singles:
+                    ok[i + 1] = True
+                for w in words:
+                    if piece.startswith(w, i):
+                        ok[i + len(w)] = True
+        return ok[-1]
+
+    def ends_with_word(piece: str) -> bool:
+        return any(piece.endswith(w) and segmentable(piece[:-len(w)]) for w in words)
+
+    def starts_with_word(piece: str) -> bool:
+        return any(piece.startswith(w) and segmentable(piece[len(w):]) for w in words)
+
+    checked = 0
+    for block in _prose_blocks():
+        for run in re.findall(r"[一-鿿](?:[一-鿿]|<wbr>)*", block):
+            if "<wbr>" not in run:
+                continue
+            pieces = run.split("<wbr>")
+            plain = "".join(pieces)
+            cuts, pos = [], 0
+            for piece in pieces[:-1]:
+                pos += len(piece)
+                cuts.append(pos)
+            for piece in pieces:
+                assert not piece or segmentable(piece), f"piece {piece!r} (in {run!r}) is not made of listed words"
+            # two one-character entries side by side may be the two halves of a listed word (只|能 for 只能)
+            for k in range(len(pieces) - 1):
+                left, right = pieces[k], pieces[k + 1]
+                if left and right and not ends_with_word(left) and not starts_with_word(right):
+                    pair = left[-1] + right[0]
+                    assert not any(pair in w for w in words), f"<wbr> may cut a word at {pair!r} in {run!r}"
+            checked += len(cuts)
+    assert checked >= 200
+
+
+def test_break_marker_is_applied_only_to_template_prose():
+    """Minor 1: the marker never turns into <wbr> in attributes, <pre>, or values that came from the sources."""
+    b = _builder()
+    marker = b.BREAK
+    html = f'<p title="a{marker}b">甲{marker}乙</p><pre>x{marker}y</pre><script>"{marker}"</script><style>{marker}</style>'
+    out = b.apply_wbr(html)
+    assert out.startswith(f'<p title="a{marker}b">甲<wbr>乙</p>')
+    assert f"<pre>x{marker}y</pre>" in out and f'<script>"{marker}"</script>' in out and f"<style>{marker}</style>" in out
+    assert b.apply_wbr("<p>工具|回傳</p>") == "<p>工具|回傳</p>"  # a plain pipe in a source value is not a break
+    assert marker not in PAGE_RAW
 
 
 def test_every_prose_block_has_a_break_opportunity_at_least_every_nine_cjk_chars():
     """With keep-all a CJK run only breaks at punctuation, spaces or <wbr>; cap the unbroken run so lines can still wrap."""
     blocks = _prose_blocks()
-    assert len(blocks) >= 20
-    for html in blocks:
-        text = re.sub(r"<(?!wbr)[^>]+>", "", html)
-        text = unescape(text)
+    assert len(blocks) >= 40
+    for text in blocks:
         for run in re.split(r"<wbr>|[^\u4e00-\u9fff]", text):
             assert len(run) <= 9, f"unbroken run of {len(run)} chars: {run!r}"
 
@@ -428,6 +567,8 @@ def test_number_and_unit_are_kept_on_one_line():
     body = re.sub(r"<[^>]+>", "", body)
     loose = re.findall(r"\d+ (?:週|筆|欄|個|名|步)", unescape(body))
     assert not loose, f"number and unit can be split across lines: {loose[:5]}"
+    assert "前 <span" not in PAGE_RAW and not re.search(r"前 \d+(?! 名)(?=[^<]*(?:<|$))", re.sub(r'<span class="nb">前 \d+(?: 名)?</span>', "", body))  # "前 N 名" is one unit
+    assert PAGE_RAW.count('<span class="nb">前 10 名</span>') == 3
     assert '<span class="nb">第 34 週</span>' in PAGE_RAW
 
 
