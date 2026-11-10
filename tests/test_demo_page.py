@@ -1,0 +1,234 @@
+"""D1-D4: the single-page demo (docs/demo/index.html) is generated, sourced, self-contained and responsive-safe.
+
+The page is built by scripts/build_demo_page.py from reports/, demo/mcp_session.md and data/secom.db.
+Tests that need the local database skip when data/secom.db is absent (it is gitignored).
+"""
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import re
+import sqlite3
+from html import unescape
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+PAGE_PATH = ROOT / "docs" / "demo" / "index.html"
+DB_PATH = ROOT / "data" / "secom.db"
+PAGE = PAGE_PATH.read_text(encoding="utf-8")
+METRICS_TEXT = (ROOT / "reports" / "metrics.json").read_text(encoding="utf-8")
+METRICS = json.loads(METRICS_TEXT)
+CLEANING = (ROOT / "reports" / "cleaning.md").read_text(encoding="utf-8")
+SESSION = (ROOT / "demo" / "mcp_session.md").read_text(encoding="utf-8")
+
+
+def _data() -> dict:
+    m = re.search(r'<script type="application/json" id="demo-data">(.*?)</script>', PAGE, re.S)
+    assert m, "embedded JSON block missing"
+    return json.loads(m.group(1).replace("<\\/", "</"))
+
+
+def _builder():
+    spec = importlib.util.spec_from_file_location("build_demo_page", ROOT / "scripts" / "build_demo_page.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _visible_text(html: str) -> str:
+    html = re.sub(r"<(script|style)\b.*?</\1>", " ", html, flags=re.S)
+    html = re.sub(r"<[^>]+>", " ", html)
+    return unescape(html)
+
+
+# ---- D1: numbers come from the sources -------------------------------------------------
+
+def test_headline_numbers_match_cleaning_report_and_session():
+    d = _data()["counts"]
+    runs = int(re.search(r"筆數（runs）\s*\|\s*(\d+)", CLEANING).group(1))
+    before, after = map(int, re.search(r"感測欄數\s*\|\s*(\d+)\s*\|\s*(\d+)", CLEANING).groups())
+    tools = json.loads(re.search(r"## tools/list\s+```json\n(.*?)```", SESSION, re.S).group(1))
+    assert d == {"runs": runs, "sensors_before": before, "sensors_after": after, "tools": len(tools)}
+    assert (runs, before, after, len(tools)) == (1567, 590, 444, 5)
+    h1 = re.search(r"<h1[^>]*>(.*?)</h1>", PAGE, re.S).group(1)
+    nums = re.findall(r'<span class="n">(\d+)</span>', h1)
+    assert nums == [str(runs), str(before), str(after), str(len(tools))]
+
+
+def test_weekly_series_adds_up_to_cleaning_report_and_matches_session_weeks():
+    weeks = _data()["weeks"]
+    total_fail = int(re.search(r"全體 [\d.]+%（(\d+) 筆）", CLEANING).group(1))
+    runs = int(re.search(r"筆數（runs）\s*\|\s*(\d+)", CLEANING).group(1))
+    assert sum(w["runs"] for w in weeks) == runs
+    assert sum(w["fails"] for w in weeks) == total_fail
+    for w in weeks:
+        assert w["yield_pct"] == round(100 * (w["runs"] - w["fails"]) / w["runs"], 2)
+    # W37..W41 were also returned by the yield_by_week call in the recorded session
+    block = SESSION.split("## tools/call `yield_by_week`")[1].split("## tools/call")[0]
+    resp = json.loads(re.findall(r"```json\n(.*?)```", block, re.S)[1])
+    by_week = {w["week"]: w for w in weeks}
+    for sw in resp["weeks"]:
+        got = by_week[sw["week"]]
+        assert (got["runs"], got["fails"], got["yield_pct"]) == (sw["runs"], sw["fails"], sw["yield_pct"])
+
+
+@pytest.mark.skipif(not DB_PATH.exists(), reason="data/secom.db not built")
+def test_weekly_series_matches_database():
+    db = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    try:
+        rows = db.execute("select strftime('%Y-W%W', ts), count(*), sum(result='fail') from runs group by 1 order by 1").fetchall()
+    finally:
+        db.close()
+    assert [(w["week"], w["runs"], w["fails"]) for w in _data()["weeks"]] == rows
+
+
+def test_low_week_is_lowest_from_week_34_and_not_claimed_as_global_minimum():
+    d = _data()
+    later = [w for w in d["weeks"] if int(w["week"].split("-W")[1]) >= 34]
+    assert d["low_week"] == min(later, key=lambda w: w["yield_pct"])
+    assert d["low_week"]["week"] == "2008-W39" and d["low_week"]["yield_pct"] == 91.12
+    assert min(w["yield_pct"] for w in d["weeks"]) < d["low_week"]["yield_pct"]  # the page says so out loud
+    assert "這不是全期最低" in PAGE
+
+
+def test_models_sensors_and_split_match_metrics_json():
+    d = _data()
+    m = METRICS
+    assert d["models"]["baseline"]["pr_auc"] == m["baseline_all_pass"]["pr_auc"]
+    for key in ("logreg", "random_forest"):
+        t = m["models"][key]["test"]
+        got = d["models"][key]
+        assert (got["pr_auc"], got["roc_auc"], got["tp"], got["fp"]) == (t["pr_auc"], t["roc_auc"], t["confusion"]["tp"], t["confusion"]["fp"])
+    for key in ("logreg", "random_forest"):
+        want = [(s["sensor"], s["importance_mean"], s["importance_std"]) for s in m["permutation_importance"]["top10"][key]]
+        assert [(s["sensor"], s["mean"], s["std"]) for s in d["top10"][key]] == want
+    rf = {s["sensor"] for s in d["top10"]["random_forest"]}
+    lr = {s["sensor"] for s in d["top10"]["logreg"]}
+    assert set(d["both"]) == rf & lr and len(d["both"]) == 3
+    assert d["split"] == {"test_rows": m["split"]["test_rows"], "test_fail": m["split"]["test_fail"], "val_fail": m["split"]["val_fail"]}
+
+
+def test_page_does_not_overstate_the_model():
+    """README: both models are only a little above all-pass, and the all-pass PR-AUC equals the test fail rate."""
+    d = _data()
+    assert d["models"]["baseline"]["pr_auc"] == METRICS["baseline_all_pass"]["pr_auc"] == METRICS["split"]["test_fail_rate"]
+    for key in ("logreg", "random_forest"):
+        assert 0 < d["models"][key]["pr_auc"] - d["models"]["baseline"]["pr_auc"] < 0.05
+    for phrase in ("只比「全猜良品」高一點", "相關不等於因果", "沒有語言模型參與", "不能拿來當自動判退的閘門"):
+        assert phrase in PAGE
+
+
+def test_every_visible_number_traces_to_a_source_or_the_embedded_json():
+    token = re.compile(r"\d+(?:\.\d+)?")
+    allowed = set(token.findall(METRICS_TEXT + CLEANING + SESSION))
+    allowed |= set(token.findall(json.dumps(_data())))
+    allowed |= {f"{w['yield_pct']:.2f}" for w in _data()["weeks"]}
+    allowed |= {"10", "100", "90", "80", "75", "0.5", "4.0", "2008", "2026", "24", "5", "3", "2", "6", "1"}  # axis ticks, licence, list sizes
+    text = _visible_text(PAGE)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"doi:\S+", " ", text)
+    unknown = sorted(set(token.findall(text)) - allowed)
+    assert not unknown, f"numbers on the page with no source: {unknown}"
+
+
+def test_replay_shows_the_session_json_verbatim():
+    blocks = SESSION.split("## tools/call ")[1:]
+    assert len(blocks) == 7
+    from html import escape
+    for k, block in enumerate(blocks):
+        for body in re.findall(r"```json\n(.*?)```", block, re.S)[:2]:
+            assert escape(body.rstrip("\n")) in PAGE, f"call {k + 1}: JSON body not shown verbatim"
+    assert PAGE.count("<details>") == 7
+
+
+@pytest.mark.skipif(not DB_PATH.exists(), reason="data/secom.db not built")
+def test_build_is_deterministic_and_committed_page_is_current():
+    b = _builder()
+    first, second = b.build(), b.build()
+    assert hashlib.sha256(first.encode()).hexdigest() == hashlib.sha256(second.encode()).hexdigest()
+    assert first == PAGE, "docs/demo/index.html is stale; rerun python scripts/build_demo_page.py"
+
+
+# ---- D2: zero external requests ----------------------------------------------------------
+
+ALLOWED_URLS = {
+    "https://github.com/angie091120-cpu/mfg-yield-agent",
+    "https://doi.org/10.24432/C54305",
+    "https://creativecommons.org/licenses/by/4.0/",
+}
+
+
+def test_only_the_repo_uci_and_licence_links_appear():
+    urls = set(re.findall(r"https?://[^\s\"'<>)]+", PAGE))
+    assert urls == ALLOWED_URLS
+
+
+def test_no_external_resource_loading():
+    assert not re.search(r"<script[^>]+\bsrc=", PAGE)
+    assert not re.search(r"<link[^>]+href=[\"'](?!data:)", PAGE)
+    assert not re.search(r"@import|url\(\s*[\"']?(?:https?:)?//", PAGE)
+    assert not re.search(r"<(img|iframe|video|audio|source|embed|object)\b", PAGE)
+    assert "googletagmanager" not in PAGE and "gtag(" not in PAGE
+
+
+def test_no_forbidden_strings():
+    """Employer names, local paths and Windows drive paths must not appear (pieces joined so this file stays clean too)."""
+    words = ["mai" + "agent", "思" + "邁", "安" + "盛", "ixen" + "sor", "/ho" + "me/", "C:" + "\\\\"]
+    low = PAGE.lower()
+    for w in words:
+        assert w.lower() not in low, w
+    build_src = (ROOT / "scripts" / "build_demo_page.py").read_text(encoding="utf-8").lower()
+    for w in words:
+        assert w.lower() not in build_src, w
+
+
+# ---- D4: responsive and accessibility guards that a grep can check -------------------------
+
+def test_document_basics():
+    assert PAGE.startswith("<!doctype html>")
+    assert '<html lang="zh-Hant">' in PAGE
+    assert PAGE.count("<h1") == 1
+    assert 'name="viewport"' in PAGE and "width=device-width" in PAGE
+    assert re.search(r'<meta name="description" content="[^"]{20,}"', PAGE)
+    assert "<title>" in PAGE and "</title>" in PAGE
+
+
+def test_reduced_motion_branch_exists():
+    assert "@media(prefers-reduced-motion:reduce)" in PAGE
+
+
+def test_heading_is_chunked_so_it_cannot_break_inside_a_word():
+    h1 = re.search(r"<h1[^>]*>(.*?)</h1>", PAGE, re.S).group(1)
+    plain = re.sub(r"<[^>]+>", "", h1)
+    assert plain == "用 1567 筆半導體製程紀錄，把 590 個感測欄清成 444 個，再交給 5 個工具查良率。"
+    assert h1.count('class="nb"') >= 6
+
+
+def test_table_header_cannot_wrap_vertically():
+    css = re.search(r"<style>(.*?)</style>", PAGE, re.S).group(1)
+    assert re.search(r"thead th\{[^}]*white-space:nowrap", css)
+    assert re.search(r"th\.rank\{[^}]*white-space:nowrap", css)
+
+
+def test_chart_labels_are_html_not_svg_text():
+    svg = re.search(r"<svg.*?</svg>", PAGE, re.S).group(0)
+    assert "<text" not in svg
+    assert 'class="yaxis"' in PAGE and 'class="xaxis"' in PAGE
+
+
+def test_both_selected_tag_has_enough_contrast():
+    """WCAG AA for the 13px bold tag: --accent-ink on --accent-bg must reach 4.5:1."""
+    css = re.search(r"<style>(.*?)</style>", PAGE, re.S).group(1)
+    fg = re.search(r"--accent-ink:(#[0-9A-Fa-f]{6})", css).group(1)
+    bg = re.search(r"--accent-bg:(#[0-9A-Fa-f]{6})", css).group(1)
+
+    def lum(h: str) -> float:
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    hi, lo = sorted((lum(fg), lum(bg)), reverse=True)
+    assert (hi + 0.05) / (lo + 0.05) >= 4.5

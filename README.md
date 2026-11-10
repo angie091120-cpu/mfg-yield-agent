@@ -6,8 +6,9 @@
 - 技術：Python（pandas、scikit-learn）、SQLite、MCP 伺服器（官方 `mcp` SDK，stdio）、Claude Code skill
 - MCP 工作階段紀錄：[demo/mcp_session.md](demo/mcp_session.md)
 - 領域筆記：[docs/domain.md](docs/domain.md)（良率、SPC、8D 與本資料集的限制）
+- 單頁 demo：<https://angie091120-cpu.github.io/mfg-yield-agent/demo/>（需要 repo 開啟 GitHub Pages：main /docs；頁面由 `python scripts/build_demo_page.py` 產生）
 
-本機 CLI 加 MCP 伺服器，沒有網站。
+Agent 本身是本機 CLI 加 MCP 伺服器，沒有網站；demo 頁只是靜態展示，不連後端。
 
 ## 1. 問題
 
@@ -142,7 +143,7 @@ model/          訓練、評估、permutation importance
 mcp/server.py   MCP 伺服器
 schema.sql      資料表定義
 tests/          pytest
-scripts/        下載資料、README 指標區塊產生、MCP 工作階段紀錄、Claude Code demo 錄製
+scripts/        下載資料、README 指標區塊產生、MCP 工作階段紀錄、Claude Code demo 錄製、demo 頁產生
 reports/        cleaning.md、metrics.json（由程式產生）
 docs/domain.md  領域筆記
 .claude/skills/yield-triage/  Claude Code skill
