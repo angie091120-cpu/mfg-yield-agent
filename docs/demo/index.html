@@ -18,7 +18,7 @@
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 :root{color-scheme:light;--bg:#F4F6FB;--surface:#fff;--ink:#1B2147;--muted:#4F5885;--primary:#20329B;--line:#D9DEEE;--hl:#DDE3FA;--accent:#B45309;--accent-ink:#7C3A06;--accent-bg:#FDEFD6;--code:#EEF1FB;
 --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Noto Sans TC",monospace}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.75 var(--sans)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.75 var(--sans);word-break:keep-all;overflow-wrap:break-word}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .nb{white-space:nowrap}
 a{color:var(--primary);text-underline-offset:3px}
@@ -75,7 +75,8 @@ details[open]>summary::after{transform:rotate(-135deg);top:1.5em}
 .sum{color:var(--muted);font-size:14px;flex:1 1 220px;min-width:0}
 .io{margin:0 0 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 .io h4{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:500}
-pre{margin:0;padding:12px 14px;background:var(--code);border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow-x:auto;overflow-y:auto;max-height:320px;max-width:100%;tab-size:2}
+pre{margin:0;padding:12px 14px;background-color:var(--code);background-image:linear-gradient(to left,var(--code) 35%,rgba(238,241,251,0)),linear-gradient(to right,var(--code) 35%,rgba(238,241,251,0)),linear-gradient(to left,rgba(32,50,155,.30),rgba(32,50,155,0)),linear-gradient(to right,rgba(32,50,155,.30),rgba(32,50,155,0));background-repeat:no-repeat;background-position:right center,left center,right center,left center;background-size:44px 100%,44px 100%,18px 100%,18px 100%;background-attachment:local,local,scroll,scroll;border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow-x:auto;overflow-y:auto;max-height:320px;max-width:100%;tab-size:2}
+.hint{margin:-8px 0 12px;font-size:13.5px;color:var(--muted)}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--bg);border-radius:8px;padding:16px 18px;font-size:15px;min-width:0}
 .card.wide{grid-column:1/-1}
@@ -110,29 +111,30 @@ footer p{margin:0 0 6px}
 <header class="top"><b>SECOM 良率查詢</b><span>作品展示・唯讀</span></header>
 
 <section class="hero" aria-labelledby="h-hero">
-<h1 id="h-hero"><span class="nb">用 <span class="n">1567</span> 筆</span><span class="nb">半導體製程紀錄，</span><span class="nb">把 <span class="n">590</span> 個</span><span class="nb">感測欄</span><span class="nb">清成 <span class="n">444</span> 個，</span><span class="nb">再交給 <span class="n">5</span> 個</span><span class="nb">工具查良率。</span></h1>
-<p>這是一個良率查詢 Agent（讓 AI 照指定順序呼叫工具、自己查資料的程式），查的是 UCI 公開的 SECOM 半導體製程資料集。它透過 MCP（讓 AI 呼叫外部工具的通訊規則）連到資料庫。下面的數字取自資料庫、訓練報告與工具的實際回傳。</p>
+<h1 id="h-hero"><span class="nb">用 <span class="n">1567</span> 筆</span><wbr><span class="nb">半導體製程紀錄，</span><wbr><span class="nb">把 <span class="n">590</span> 個</span><wbr><span class="nb">感測欄</span><wbr><span class="nb">清成 <span class="n">444</span> 個，</span><wbr><span class="nb">再交給 <span class="n">5</span> 個</span><wbr><span class="nb">工具查良率。</span></h1>
+<p>這是一個<wbr>良率查詢 Agent（讓 AI 照指定順序<wbr>呼叫工具、自己<wbr>查資料<wbr>的程式），查的是 UCI 公開的 SECOM 半導體<wbr>製程<wbr>資料集。它透過 MCP（讓 AI 呼叫<wbr>外部工具<wbr>的通訊規則）連到<wbr>資料庫。下面的<wbr>數字<wbr>取自<wbr>資料庫、訓練報告<wbr>與工具的<wbr>實際回傳。</p>
 <p class="links"><a href="https://github.com/angie091120-cpu/mfg-yield-agent">原始碼（GitHub）</a></p>
 </section>
 
 <section class="zone" aria-labelledby="h-yield">
 <h2 id="h-yield">每週良率</h2>
-<p class="lede">2008 年第 28 到 41 週，每個點是一週（週次從週一起算，不是 ISO 週次），滑鼠移上去看筆數。第 34 週以後最低的是第 39 週：169 筆中 15 筆不良，良率 91.12%。</p>
-<p class="lede">這不是全期最低。第 34 週以前有 6 週更低，其中樣本最少的一週只有 13 筆。下面的重播查的是第 37 到 41 週。</p>
+<p class="lede">2008 年<wbr><span class="nb">第 28 到 41 週</span>，每個點<wbr>是一週（週次<wbr>從週一<wbr>起算，不是 ISO 週次），滑鼠<wbr>移上去<wbr>看筆數。<span class="nb">第 34 週</span><wbr>以後<wbr>最低的<wbr>是<span class="nb">第 39 週</span>：<span class="nb">169 筆</span>中 <span class="nb">15 筆</span><wbr>不良，良率 91.12%。</p>
+<p class="lede">這不是<wbr>全期<wbr>最低。<span class="nb">第 34 週</span><wbr>以前有 <span class="nb">6 週</span><wbr>更低，其中<wbr>樣本<wbr>最少的<wbr>一週<wbr>只有 <span class="nb">13 筆</span>。下面的<wbr>重播<wbr>查的是<wbr><span class="nb">第 37 到 41 週</span>。</p>
 <div class="chart"><div class="yaxis" aria-hidden="true"><span style="top:96.30%">75%</span><span style="top:77.78%">80%</span><span style="top:40.74%">90%</span><span style="top:3.70%">100%</span></div><div class="plot" role="img" aria-label="每週良率折線圖，2008 年第 28 到 41 週，第 39 週是第 34 週以後的低點，91.12%"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line class="g" x1="0" x2="100" y1="96.30" y2="96.30"/><line class="g" x1="0" x2="100" y1="77.78" y2="77.78"/><line class="g" x1="0" x2="100" y1="40.74" y2="40.74"/><line class="g" x1="0" x2="100" y1="3.70" y2="3.70"/><polyline class="ln" points="3.00,89.19 10.23,38.96 17.46,80.85 24.69,51.70 31.92,54.56 39.15,42.89 46.38,19.04 53.62,9.26 60.85,19.30 68.08,15.74 75.31,12.63 82.54,36.59 89.77,25.19 97.00,7.63"/></svg><span class="dot" style="left:3.00%;top:89.19%" title="W28：13 筆，3 筆不良，良率 76.92%"></span><span class="dot" style="left:10.23%;top:38.96%" title="W29：21 筆，2 筆不良，良率 90.48%"></span><span class="dot" style="left:17.46%;top:80.85%" title="W30：48 筆，10 筆不良，良率 79.17%"></span><span class="dot" style="left:24.69%;top:51.70%" title="W31：108 筆，14 筆不良，良率 87.04%"></span><span class="dot" style="left:31.92%;top:54.56%" title="W32：51 筆，7 筆不良，良率 86.27%"></span><span class="dot" style="left:39.15%;top:42.89%" title="W33：208 筆，22 筆不良，良率 89.42%"></span><span class="dot" style="left:46.38%;top:19.04%" title="W34：169 筆，7 筆不良，良率 95.86%"></span><span class="dot" style="left:53.62%;top:9.26%" title="W35：133 筆，2 筆不良，良率 98.50%"></span><span class="dot" style="left:60.85%;top:19.30%" title="W36：95 筆，4 筆不良，良率 95.79%"></span><span class="dot" style="left:68.08%;top:15.74%" title="W37：154 筆，5 筆不良，良率 96.75%"></span><span class="dot" style="left:75.31%;top:12.63%" title="W38：166 筆，4 筆不良，良率 97.59%"></span><span class="dot low" style="left:82.54%;top:36.59%" title="W39：169 筆，15 筆不良，良率 91.12%"></span><span class="dot" style="left:89.77%;top:25.19%" title="W40：138 筆，8 筆不良，良率 94.20%"></span><span class="dot" style="left:97.00%;top:7.63%" title="W41：94 筆，1 筆不良，良率 98.94%"></span><span class="note mono" style="left:82.54%;top:calc(36.59% + 17px)">W39　91.12%</span></div><div class="xaxis" aria-hidden="true"><span class="" style="left:3.00%">W28</span><span class="opt" style="left:10.23%">W29</span><span class="opt" style="left:17.46%">W30</span><span class="opt" style="left:24.69%">W31</span><span class="opt" style="left:31.92%">W32</span><span class="opt" style="left:39.15%">W33</span><span class="" style="left:46.38%">W34</span><span class="opt" style="left:53.62%">W35</span><span class="opt" style="left:60.85%">W36</span><span class="opt" style="left:68.08%">W37</span><span class="opt" style="left:75.31%">W38</span><span class="" style="left:82.54%">W39</span><span class="opt" style="left:89.77%">W40</span><span class="" style="left:97.00%">W41</span></div></div>
 </section>
 
 <section class="zone" aria-labelledby="h-sensors">
-<h2 id="h-sensors">可疑感測欄前 10 名</h2>
-<p class="lede">兩個模型各自排出前 10。表中的數字是重要度：把該欄的值打亂後，PR-AUC（看模型抓不良品抓得準不準的分數，亂猜時等於不良率）掉了多少，越大越可疑。</p>
-<p class="lede">橘底加 <span class="mk">◆</span> 的是兩邊都進前 10 的 3 欄：s103、s510、s348。排名只代表這些欄和不良一起變動，不代表原因。隨機森林有 2 欄（s454、s033）的標準差不小於平均，這些排名不可靠。</p>
+<h2 id="h-sensors">可疑感測欄前 <span class="nb">10 名</span></h2>
+<p class="lede">兩個<wbr>模型<wbr>各自<wbr>排出<wbr>前 10。表中的<wbr>數字<wbr>是<wbr>重要度：把<wbr>該欄的<wbr>值<wbr>打亂後，PR-AUC（看<wbr>模型<wbr>抓<wbr>不良品<wbr>抓得<wbr>準不準<wbr>的分數，亂猜時<wbr>等於<wbr>不良率）掉了<wbr>多少，越大<wbr>越可疑。</p>
+<p class="lede">橘底<wbr>加 <span class="mk">◆</span> 的是<wbr>兩邊<wbr>都進<wbr>前 10 的 <span class="nb">3 欄</span>：s103、s510、s348。排名<wbr>只代表<wbr>這些欄<wbr>和不良<wbr>一起<wbr>變動，不代表<wbr>原因。隨機森林<wbr>有 <span class="nb">2 欄</span>（s454、s033）的<wbr>標準差<wbr>不小於<wbr>平均，這些<wbr>排名<wbr>不可靠。</p>
 <div class="table-wrap"><table><thead><tr><th scope="col" class="rank">名次</th><th scope="col">隨機森林<small>Random Forest</small></th><th scope="col">邏輯迴歸<small>Logistic Regression</small></th></tr></thead><tbody><tr><th scope="row" class="rank mono">1</th><td class="hit"><span class="mono">s103</span><span class="v mono">0.0044</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td><td class="hit"><span class="mono">s348</span><span class="v mono">0.0083</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td></tr><tr><th scope="row" class="rank mono">2</th><td class=""><span class="mono">s035</span><span class="v mono">0.0029</span></td><td class="hit"><span class="mono">s103</span><span class="v mono">0.0061</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td></tr><tr><th scope="row" class="rank mono">3</th><td class="hit"><span class="mono">s510</span><span class="v mono">0.0026</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td><td class=""><span class="mono">s124</span><span class="v mono">0.0053</span></td></tr><tr><th scope="row" class="rank mono">4</th><td class=""><span class="mono">s573</span><span class="v mono">0.0022</span></td><td class=""><span class="mono">s121</span><span class="v mono">0.0051</span></td></tr><tr><th scope="row" class="rank mono">5</th><td class=""><span class="mono">s102</span><span class="v mono">0.0018</span></td><td class=""><span class="mono">s210</span><span class="v mono">0.005</span></td></tr><tr><th scope="row" class="rank mono">6</th><td class=""><span class="mono">s019</span><span class="v mono">0.0017</span></td><td class="hit"><span class="mono">s510</span><span class="v mono">0.0046</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td></tr><tr><th scope="row" class="rank mono">7</th><td class=""><span class="mono">s068</span><span class="v mono">0.0016</span></td><td class=""><span class="mono">s133</span><span class="v mono">0.0039</span></td></tr><tr><th scope="row" class="rank mono">8</th><td class=""><span class="mono">s454</span><span class="v mono">0.0014</span></td><td class=""><span class="mono">s123</span><span class="v mono">0.0039</span></td></tr><tr><th scope="row" class="rank mono">9</th><td class=""><span class="mono">s033</span><span class="v mono">0.0013</span></td><td class=""><span class="mono">s056</span><span class="v mono">0.0038</span></td></tr><tr><th scope="row" class="rank mono">10</th><td class="hit"><span class="mono">s348</span><span class="v mono">0.0013</span><span class="tag"><span aria-hidden="true">◆</span> 兩模型都選到</span></td><td class=""><span class="mono">s130</span><span class="v mono">0.0032</span></td></tr></tbody></table></div>
 </section>
 
 <section class="zone" aria-labelledby="h-replay">
 <h2 id="h-replay">Agent 查詢重播</h2>
-<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 2026-11-09）。這段由腳本照 skill（寫給 AI 的作業說明檔，規定查詢步驟）的順序呼叫 MCP 伺服器，沒有語言模型參與；每步回應標的 isError 是工具回報這次有沒有出錯的欄位；呼叫順序與筆記內文都是事先寫死的。</p>
-<ol class="replay"><li><details><summary><span class="stepno mono">1</span><span class="nm mono">yield_by_week</span><span class="sum">查 2008-09-15 到 2008-10-17；W39 169 筆、15 筆不良，良率 91.12%</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 1 步的請求">{
+<p class="lede">依序<wbr>點開<wbr>看請求<wbr>與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的<wbr>原樣<wbr>輸出（紀錄<wbr>產生於 2026-11-09）。這段<wbr>由腳本<wbr>照 skill（寫給 AI 的<wbr>作業<wbr>說明檔，規定<wbr>查詢<wbr>步驟）的<wbr>順序<wbr>呼叫 MCP 伺服器，沒有<wbr>語言模型<wbr>參與；每步<wbr>回應<wbr>標的 isError 是<wbr>工具<wbr>回報<wbr>這次<wbr>有沒有<wbr>出錯<wbr>的欄位；呼叫<wbr>順序<wbr>與<wbr>筆記<wbr>內文<wbr>都是<wbr>事先<wbr>寫死的。</p>
+<p class="hint"><span class="nb">第 1 步</span>已展開。方框內的長行<wbr>可以<wbr>左右滑動<wbr>看完整內容，右緣<wbr>有陰影<wbr>就代表<wbr>還有。</p>
+<ol class="replay"><li><details open><summary><span class="stepno mono">1</span><span class="nm mono">yield_by_week</span><span class="sum">查 2008-09-15 到 2008-10-17；W39 <span class="nb">169 筆</span>、<span class="nb">15 筆</span><wbr>不良，良率 91.12%</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 1 步的請求">{
   &quot;start&quot;: &quot;2008-09-15&quot;,
   &quot;end&quot;: &quot;2008-10-17&quot;
 }</pre></div><div><h4>回應（isError=false）</h4><pre tabindex="0" aria-label="第 1 步的回應">{
@@ -192,7 +194,7 @@ footer p{margin:0 0 6px}
     &quot;yield_pct&quot;: 95.42
   },
   &quot;source&quot;: &quot;runs table; week = strftime(&#x27;%Y-W%W&#x27;, ts), Monday-start&quot;
-}</pre></div></div></details></li><li><details><summary><span class="stepno mono">2</span><span class="nm mono">top_suspect_sensors</span><span class="sum">取前 5 名；第 1 名 s103，重要度 0.0044</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 2 步的請求">{
+}</pre></div></div></details></li><li><details><summary><span class="stepno mono">2</span><span class="nm mono">top_suspect_sensors</span><span class="sum">取前 <span class="nb">5 名</span>；<span class="nb">第 1 名</span> s103，重要度 0.0044</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 2 步的請求">{
   &quot;n&quot;: 5
 }</pre></div><div><h4>回應（isError=false）</h4><pre tabindex="0" aria-label="第 2 步的回應">{
   &quot;model&quot;: &quot;random_forest&quot;,
@@ -231,7 +233,7 @@ footer p{margin:0 0 6px}
   ],
   &quot;caveat&quot;: &quot;Correlation with fail, not cause. Sensor names are anonymous in the source data.&quot;,
   &quot;source&quot;: &quot;suspects table, written by model/train.py; same numbers as reports/metrics.json&quot;
-}</pre></div></div></details></li><li><details><summary><span class="stepno mono">3</span><span class="nm mono">compare_sensor</span><span class="sum">s103：不良組中位數 -0.0082，良品組 -0.0102；標準化平均差 0.5713（兩組平均值的差，用標準差當單位）</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 3 步的請求">{
+}</pre></div></div></details></li><li><details><summary><span class="stepno mono">3</span><span class="nm mono">compare_sensor</span><span class="sum">s103：不良組<wbr>中位數 -0.0082，良品組<wbr>中位數 -0.0102；標準化<wbr>平均差 0.5713（兩組<wbr>平均值<wbr>的差，用<wbr>標準差<wbr>當單位）</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 3 步的請求">{
   &quot;sensor&quot;: &quot;s103&quot;
 }</pre></div><div><h4>回應（isError=false）</h4><pre tabindex="0" aria-label="第 3 步的回應">{
   &quot;sensor&quot;: &quot;s103&quot;,
@@ -260,7 +262,7 @@ footer p{margin:0 0 6px}
   &quot;std_mean_diff_fail_minus_pass&quot;: 0.5713,
   &quot;note&quot;: &quot;Statistics use measured values only; median-imputed cells are excluded and counted.&quot;,
   &quot;source&quot;: &quot;features JOIN runs, all 1567 runs (train and test)&quot;
-}</pre></div></div></details></li><li><details><summary><span class="stepno mono">4</span><span class="nm mono">compare_sensor</span><span class="sum">s035：不良組中位數 64.13875，良品組 64.1668；標準化平均差 -0.0565</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 4 步的請求">{
+}</pre></div></div></details></li><li><details><summary><span class="stepno mono">4</span><span class="nm mono">compare_sensor</span><span class="sum">s035：不良組<wbr>中位數 64.13875，良品組<wbr>中位數 64.1668；標準化<wbr>平均差 -0.0565</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 4 步的請求">{
   &quot;sensor&quot;: &quot;s035&quot;
 }</pre></div><div><h4>回應（isError=false）</h4><pre tabindex="0" aria-label="第 4 步的回應">{
   &quot;sensor&quot;: &quot;s035&quot;,
@@ -289,7 +291,7 @@ footer p{margin:0 0 6px}
   &quot;std_mean_diff_fail_minus_pass&quot;: -0.0565,
   &quot;note&quot;: &quot;Statistics use measured values only; median-imputed cells are excluded and counted.&quot;,
   &quot;source&quot;: &quot;features JOIN runs, all 1567 runs (train and test)&quot;
-}</pre></div></div></details></li><li><details><summary><span class="stepno mono">5</span><span class="nm mono">draft_investigation_note</span><span class="sum">寫入 s103 的調查筆記，回應 status = draft</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 5 步的請求">{
+}</pre></div></div></details></li><li><details><summary><span class="stepno mono">5</span><span class="nm mono">draft_investigation_note</span><span class="sum">寫入 s103 的<wbr>調查<wbr>筆記，回應 status = draft</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 5 步的請求">{
   &quot;sensor&quot;: &quot;s103&quot;,
   &quot;text&quot;: &quot;2008-W39 良率 91.12%（yield_by_week），前兩週 96.75%、97.59%。s103 在 top_suspect_sensors 排第 1；compare_sensor：fail 組中位數 -0.0082、pass 組 -0.0102，標準化平均差 0.5713。待確認：s103 對應哪一站、該站 W39 前後是否有保養或換料紀錄。&quot;
 }</pre></div><div><h4>回應（isError=false）</h4><pre tabindex="0" aria-label="第 5 步的回應">{
@@ -298,7 +300,7 @@ footer p{margin:0 0 6px}
   &quot;status&quot;: &quot;draft&quot;,
   &quot;created_at&quot;: &quot;2026-11-09T15:55:25Z&quot;,
   &quot;next_step&quot;: &quot;A quality engineer reviews this draft and marks it confirmed after on-site checks. This server has no tool to do that.&quot;
-}</pre></div></div></details></li><li class="sep">下面兩步是閘門測試，不屬於查詢流程。</li><li><details><summary><span class="stepno mono try">6</span><span class="nm mono">draft_investigation_note</span><span class="sum">請求硬塞 status: confirmed，回應的 status 仍是 draft</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 6 步的請求">{
+}</pre></div></div></details></li><li class="sep">下面兩步是閘門測試，不屬於查詢流程。</li><li><details><summary><span class="stepno mono try">6</span><span class="nm mono">draft_investigation_note</span><span class="sum">請求<wbr>硬塞 status: confirmed，回應的 status 仍是 draft</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 6 步的請求">{
   &quot;sensor&quot;: &quot;s103&quot;,
   &quot;text&quot;: &quot;嘗試直接寫成 confirmed&quot;,
   &quot;status&quot;: &quot;confirmed&quot;
@@ -308,31 +310,31 @@ footer p{margin:0 0 6px}
   &quot;status&quot;: &quot;draft&quot;,
   &quot;created_at&quot;: &quot;2026-11-09T15:55:25Z&quot;,
   &quot;next_step&quot;: &quot;A quality engineer reviews this draft and marks it confirmed after on-site checks. This server has no tool to do that.&quot;
-}</pre></div></div></details></li><li><details><summary><span class="stepno mono try">7</span><span class="nm mono">compare_sensor</span><span class="sum">感測欄名帶 SQL 片段，工具回錯誤（isError=true），沒有執行</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 7 步的請求">{
+}</pre></div></div></details></li><li><details><summary><span class="stepno mono try">7</span><span class="nm mono">compare_sensor</span><span class="sum">感測欄名<wbr>帶 SQL 片段，工具<wbr>回錯誤（isError=true），沒有<wbr>執行</span></summary><div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 7 步的請求">{
   &quot;sensor&quot;: &quot;s103&#x27; OR &#x27;1&#x27;=&#x27;1&quot;
 }</pre></div><div><h4>回應（isError=true）</h4><pre tabindex="0" aria-label="第 7 步的回應">&quot;Error executing tool compare_sensor: sensor must look like s000..s589, got \&quot;s103&#x27; or &#x27;1&#x27;=&#x27;1\&quot;&quot;</pre></div></div></details></li></ol>
 </section>
 
 <section class="zone" aria-labelledby="h-limits">
 <h2 id="h-limits">限制與誠實聲明</h2>
-<p class="lede">先看結論：模型的效果只比「全猜良品」高一點，排名只是相關，不證明因果。</p>
+<p class="lede">先看<wbr>結論：模型的<wbr>效果<wbr>只比<wbr>「全猜良品」<wbr>高一點，排名<wbr>只是<wbr>相關，不證明<wbr>因果。</p>
 <div class="cards">
-<div class="card wide"><h3>模型只比「全猜良品」高一點</h3>
-<p>測試期 314 筆，其中 17 筆不良。全猜良品的 PR-AUC 就是不良率 0.0541，邏輯迴歸 0.0936，隨機森林 0.0725。</p>
+<div class="card wide"><h3>模型<wbr>只比<wbr>「全猜良品」<wbr>高一點</h3>
+<p>測試期 <span class="nb">314 筆</span>，其中 <span class="nb">17 筆</span><wbr>不良。全猜良品的 PR-AUC 就是<wbr>不良率 0.0541，邏輯迴歸 0.0936，隨機森林 0.0725。</p>
 <div class="table-wrap"><table class="cmp"><thead><tr><th scope="col">模型</th><th scope="col" class="num">PR-AUC</th><th scope="col" class="num">抓到不良</th><th scope="col" class="num">誤報</th></tr></thead><tbody><tr class="base"><th scope="row" class="nb">全猜良品</th><td class="num mono">0.0541</td><td class="num mono">0／17</td><td class="num mono">0</td></tr><tr class=""><th scope="row" class="nb">邏輯迴歸</th><td class="num mono">0.0936</td><td class="num mono">9／17</td><td class="num mono">77</td></tr><tr class=""><th scope="row" class="nb">隨機森林</th><td class="num mono">0.0725</td><td class="num mono">11／17</td><td class="num mono">136</td></tr></tbody></table></div>
-<p class="after">隨機森林的 ROC-AUC 是 0.5357（0.5 等於亂猜），這個模型不能拿來當自動判退的閘門。驗證段只有 11 筆不良，選模型這一步本身就不穩：照事先定好的規則選到隨機森林，但在測試期它比邏輯迴歸差。測試期只有 17 筆不良，指標的誤差很大。</p></div>
-<div class="card"><h3>相關不等於因果</h3>
-<p>前 10 名只能當排查順序的參考，沒有驗證過比隨機挑欄好，兩個模型的前 10 名只重疊 3 欄。</p>
-<p>感測欄是匿名的，沒有站別、機台、批號，所以回答不了「哪個站」，只給得出感測欄編號。時間戳是測試時間，不是各站的加工時間。</p></div>
-<div class="card"><h3>筆記只能是草稿</h3>
-<p>draft 閘門只在 MCP 工具層成立，前提是 Agent 只能透過這 5 個工具碰資料庫。Agent 若同時有 shell（能直接下指令的終端機）或檔案工具，就能直接改資料庫繞過閘門。</p>
-<p>確認筆記的步驟沒有做，要由人到現場確認。</p></div>
+<p class="after">隨機森林的 ROC-AUC 是 0.5357（0.5 等於<wbr>亂猜），這個<wbr>模型<wbr>不能<wbr>拿來<wbr>當<wbr>自動<wbr>判退的<wbr>閘門。驗證段<wbr>只有 <span class="nb">11 筆</span><wbr>不良，選模型<wbr>這一步<wbr>本身<wbr>就不穩：照<wbr>事先<wbr>定好的<wbr>規則<wbr>選到<wbr>隨機森林，但在<wbr>測試期<wbr>它比<wbr>邏輯迴歸<wbr>差。測試期<wbr>只有 <span class="nb">17 筆</span><wbr>不良，指標的<wbr>誤差<wbr>很大。</p></div>
+<div class="card"><h3>相關<wbr>不等於<wbr>因果</h3>
+<p>前 <span class="nb">10 名</span><wbr>只能<wbr>當<wbr>排查<wbr>順序的<wbr>參考，沒有<wbr>驗證過<wbr>比隨機<wbr>挑欄<wbr>好，兩個<wbr>模型的<wbr>前 <span class="nb">10 名</span><wbr>只重疊 <span class="nb">3 欄</span>。</p>
+<p>感測欄<wbr>是匿名的，沒有<wbr>站別、機台、批號，所以<wbr>回答不了<wbr>「哪個站」，只給得出<wbr>感測欄<wbr>編號。時間戳<wbr>是測試<wbr>時間，不是<wbr>各站的<wbr>加工<wbr>時間。</p></div>
+<div class="card"><h3>筆記<wbr>只能是<wbr>草稿</h3>
+<p>draft 閘門<wbr>只在 MCP 工具層<wbr>成立，前提是 Agent 只能<wbr>透過<wbr>這 <span class="nb">5 個</span><wbr>工具<wbr>碰資料庫。Agent 若同時<wbr>有 shell（能<wbr>直接<wbr>下指令<wbr>的終端機）或<wbr>檔案<wbr>工具，就能<wbr>直接<wbr>改<wbr>資料庫<wbr>繞過<wbr>閘門。</p>
+<p>確認<wbr>筆記的<wbr>步驟<wbr>沒有做，要由<wbr>人<wbr>到現場<wbr>確認。</p></div>
 </div>
 </section>
 
 <footer>
-<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="https://doi.org/10.24432/C54305">doi:10.24432/C54305</a>，授權 <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>。本頁只含由這份資料算出的衍生結果。</p>
-<p>頁面由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="https://github.com/angie091120-cpu/mfg-yield-agent">原始碼（GitHub）</a></p>
+<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="https://doi.org/10.24432/C54305">doi:10.24432/C54305</a>，授權 <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>。本頁<wbr>只含<wbr>由這份<wbr>資料<wbr>算出的<wbr>衍生<wbr>結果。</p>
+<p>頁面<wbr>由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫<wbr>與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="https://github.com/angie091120-cpu/mfg-yield-agent">原始碼（GitHub）</a></p>
 </footer>
 </main>
 <script type="application/json" id="demo-data">{"both":["s103","s510","s348"],"counts":{"runs":1567,"sensors_after":444,"sensors_before":590,"tools":5},"earlier_lower_weeks":6,"earlier_min_runs":13,"low_week":{"fails":15,"runs":169,"week":"2008-W39","yield_pct":91.12},"models":{"baseline":{"fp":0,"pr_auc":0.0541,"tp":0},"logreg":{"fp":77,"pr_auc":0.0936,"roc_auc":0.6621,"tp":9},"random_forest":{"fp":136,"pr_auc":0.0725,"roc_auc":0.5357,"tp":11}},"replay_weeks":[37,41],"rf_noisy":["s454","s033"],"split":{"test_fail":17,"test_rows":314,"val_fail":11},"top10":{"logreg":[{"mean":0.0083,"sensor":"s348","std":0.0011},{"mean":0.0061,"sensor":"s103","std":0.0013},{"mean":0.0053,"sensor":"s124","std":0.0009},{"mean":0.0051,"sensor":"s121","std":0.0008},{"mean":0.005,"sensor":"s210","std":0.0009},{"mean":0.0046,"sensor":"s510","std":0.0012},{"mean":0.0039,"sensor":"s133","std":0.0011},{"mean":0.0039,"sensor":"s123","std":0.0009},{"mean":0.0038,"sensor":"s056","std":0.0012},{"mean":0.0032,"sensor":"s130","std":0.0016}],"random_forest":[{"mean":0.0044,"sensor":"s103","std":0.0016},{"mean":0.0029,"sensor":"s035","std":0.0017},{"mean":0.0026,"sensor":"s510","std":0.0011},{"mean":0.0022,"sensor":"s573","std":0.0014},{"mean":0.0018,"sensor":"s102","std":0.0012},{"mean":0.0017,"sensor":"s019","std":0.0014},{"mean":0.0016,"sensor":"s068","std":0.0009},{"mean":0.0014,"sensor":"s454","std":0.0015},{"mean":0.0013,"sensor":"s033","std":0.0021},{"mean":0.0013,"sensor":"s348","std":0.001}]},"weeks":[{"fails":3,"runs":13,"week":"2008-W28","yield_pct":76.92},{"fails":2,"runs":21,"week":"2008-W29","yield_pct":90.48},{"fails":10,"runs":48,"week":"2008-W30","yield_pct":79.17},{"fails":14,"runs":108,"week":"2008-W31","yield_pct":87.04},{"fails":7,"runs":51,"week":"2008-W32","yield_pct":86.27},{"fails":22,"runs":208,"week":"2008-W33","yield_pct":89.42},{"fails":7,"runs":169,"week":"2008-W34","yield_pct":95.86},{"fails":2,"runs":133,"week":"2008-W35","yield_pct":98.5},{"fails":4,"runs":95,"week":"2008-W36","yield_pct":95.79},{"fails":5,"runs":154,"week":"2008-W37","yield_pct":96.75},{"fails":4,"runs":166,"week":"2008-W38","yield_pct":97.59},{"fails":15,"runs":169,"week":"2008-W39","yield_pct":91.12},{"fails":8,"runs":138,"week":"2008-W40","yield_pct":94.2},{"fails":1,"runs":94,"week":"2008-W41","yield_pct":98.94}]}</script>

@@ -156,7 +156,7 @@ CSS = r"""
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 :root{color-scheme:light;--bg:#F4F6FB;--surface:#fff;--ink:#1B2147;--muted:#4F5885;--primary:#20329B;--line:#D9DEEE;--hl:#DDE3FA;--accent:#B45309;--accent-ink:#7C3A06;--accent-bg:#FDEFD6;--code:#EEF1FB;
 --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Noto Sans TC",monospace}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.75 var(--sans)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.75 var(--sans);word-break:keep-all;overflow-wrap:break-word}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .nb{white-space:nowrap}
 a{color:var(--primary);text-underline-offset:3px}
@@ -213,7 +213,8 @@ details[open]>summary::after{transform:rotate(-135deg);top:1.5em}
 .sum{color:var(--muted);font-size:14px;flex:1 1 220px;min-width:0}
 .io{margin:0 0 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 .io h4{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:500}
-pre{margin:0;padding:12px 14px;background:var(--code);border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow-x:auto;overflow-y:auto;max-height:320px;max-width:100%;tab-size:2}
+pre{margin:0;padding:12px 14px;background-color:var(--code);background-image:linear-gradient(to left,var(--code) 35%,rgba(238,241,251,0)),linear-gradient(to right,var(--code) 35%,rgba(238,241,251,0)),linear-gradient(to left,rgba(32,50,155,.30),rgba(32,50,155,0)),linear-gradient(to right,rgba(32,50,155,.30),rgba(32,50,155,0));background-repeat:no-repeat;background-position:right center,left center,right center,left center;background-size:44px 100%,44px 100%,18px 100%,18px 100%;background-attachment:local,local,scroll,scroll;border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow-x:auto;overflow-y:auto;max-height:320px;max-width:100%;tab-size:2}
+.hint{margin:-8px 0 12px;font-size:13.5px;color:var(--muted)}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--bg);border-radius:8px;padding:16px 18px;font-size:15px;min-width:0}
 .card.wide{grid-column:1/-1}
@@ -246,7 +247,19 @@ footer p{margin:0 0 6px}
 
 def chunks(parts: list[str]) -> str:
     """Wrap each phrase in a no-wrap span so a heading can only break between phrases."""
-    return "".join(f'<span class="nb">{p}</span>' for p in parts)
+    return "<wbr>".join(f'<span class="nb">{p}</span>' for p in parts)
+
+
+def apply_wbr(html: str) -> str:
+    """Turn the '|' word-boundary markers in prose into <wbr>. With word-break:keep-all a CJK line can only
+    break at punctuation, spaces or these marks, so a word is never split. <pre>, <style>, <script> stay untouched."""
+    parts = re.split(r"(<pre\b.*?</pre>|<style>.*?</style>|<script\b.*?</script>)", html, flags=re.S)
+    def prose(p: str) -> str:
+        p = p.replace("|", "<wbr>")
+        # a number and its unit are one word: keep them on one line (never inside a tag's attributes)
+        return re.sub(r"((?:第 )?\d+(?: 到 \d+)? (?:週|筆|欄|個|名|步))(?![^<]*>)", r'<span class="nb">\1</span>', p)
+
+    return "".join(p if i % 2 else prose(p) for i, p in enumerate(parts))
 
 
 def fmt_pct(v: float) -> str:
@@ -312,15 +325,15 @@ def replay_items(calls: list[dict], low: dict) -> list[dict]:
     lw = next(w for w in yb["response"]["weeks"] if w["week"] == low["week"])
     r = yb["request"]
     items = [
-        (yb, f"查 {r['start']} 到 {r['end']}；W{week_no(lw['week'])} {lw['runs']} 筆、{lw['fails']} 筆不良，良率 {lw['yield_pct']}%"),
+        (yb, f"查 {r['start']} 到 {r['end']}；W{week_no(lw['week'])} {lw['runs']} 筆、{lw['fails']} 筆|不良，良率 {lw['yield_pct']}%"),
         (ts, f"取前 {ts['request']['n']} 名；第 1 名 {ts['response']['sensors'][0]['sensor']}，重要度 {ts['response']['sensors'][0]['importance_mean']}"),
-        (c103, f"{c103['request']['sensor']}：不良組中位數 {c103['response']['fail']['median']}，良品組 {c103['response']['pass']['median']}；"
-               f"標準化平均差 {c103['response']['std_mean_diff_fail_minus_pass']}（兩組平均值的差，用標準差當單位）"),
-        (c035, f"{c035['request']['sensor']}：不良組中位數 {c035['response']['fail']['median']}，良品組 {c035['response']['pass']['median']}；"
-               f"標準化平均差 {c035['response']['std_mean_diff_fail_minus_pass']}"),
-        (note, f"寫入 {note['request']['sensor']} 的調查筆記，回應 status = {note['response']['status']}"),
-        (gate, f"請求硬塞 status: {gate['request']['status']}，回應的 status 仍是 {gate['response']['status']}"),
-        (inj, "感測欄名帶 SQL 片段，工具回錯誤（isError=true），沒有執行"),
+        (c103, f"{c103['request']['sensor']}：不良組|中位數 {c103['response']['fail']['median']}，良品組|中位數 {c103['response']['pass']['median']}；"
+               f"標準化|平均差 {c103['response']['std_mean_diff_fail_minus_pass']}（兩組|平均值|的差，用|標準差|當單位）"),
+        (c035, f"{c035['request']['sensor']}：不良組|中位數 {c035['response']['fail']['median']}，良品組|中位數 {c035['response']['pass']['median']}；"
+               f"標準化|平均差 {c035['response']['std_mean_diff_fail_minus_pass']}"),
+        (note, f"寫入 {note['request']['sensor']} 的|調查|筆記，回應 status = {note['response']['status']}"),
+        (gate, f"請求|硬塞 status: {gate['request']['status']}，回應的 status 仍是 {gate['response']['status']}"),
+        (inj, "感測欄名|帶 SQL 片段，工具|回錯誤（isError=true），沒有|執行"),
     ]
     assert gate["request"].get("status") == "confirmed" and gate["response"]["status"] == "draft"
     assert inj["is_error"] and not any(c["is_error"] for c in by[:6])
@@ -335,7 +348,7 @@ def replay_html(items: list[dict]) -> str:
             out.append('<li class="sep">下面兩步是閘門測試，不屬於查詢流程。</li>')
         circle = f'<span class="stepno mono{" try" if k >= 5 else ""}">{k + 1}</span>'
         out.append(
-            f'<li><details><summary>{circle}<span class="nm mono">{escape(c["tool"])}</span>'
+            f'<li><details{" open" if k == 0 else ""}><summary>{circle}<span class="nm mono">{escape(c["tool"])}</span>'
             f'<span class="sum">{escape(it["summary"])}</span></summary>'
             f'<div class="io"><div><h4>請求</h4><pre tabindex="0" aria-label="第 {k + 1} 步的請求">{escape(c["request_text"])}</pre></div>'
             f'<div><h4>回應（isError={"true" if c["is_error"] else "false"}）</h4>'
@@ -396,50 +409,51 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 
 <section class="hero" aria-labelledby="h-hero">
 <h1 id="h-hero">{h1}</h1>
-<p>這是一個良率查詢 Agent（讓 AI 照指定順序呼叫工具、自己查資料的程式），查的是 UCI 公開的 SECOM 半導體製程資料集。它透過 MCP（讓 AI 呼叫外部工具的通訊規則）連到資料庫。下面的數字取自資料庫、訓練報告與工具的實際回傳。</p>
+<p>這是一個|良率查詢 Agent（讓 AI 照指定順序|呼叫工具、自己|查資料|的程式），查的是 UCI 公開的 SECOM 半導體|製程|資料集。它透過 MCP（讓 AI 呼叫|外部工具|的通訊規則）連到|資料庫。下面的|數字|取自|資料庫、訓練報告|與工具的|實際回傳。</p>
 <p class="links"><a href="{REPO_URL}">原始碼（GitHub）</a></p>
 </section>
 
 <section class="zone" aria-labelledby="h-yield">
 <h2 id="h-yield">每週良率</h2>
-<p class="lede">2008 年第 {week_no(w0)} 到 {week_no(w1)} 週，每個點是一週（週次從週一起算，不是 ISO 週次），滑鼠移上去看筆數。第 {RANGE_START_WEEK} 週以後最低的是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆不良，良率 {fmt_pct(low['yield_pct'])}。</p>
-<p class="lede">這不是全期最低。第 {RANGE_START_WEEK} 週以前有 {data['earlier_lower_weeks']} 週更低，其中樣本最少的一週只有 {data['earlier_min_runs']} 筆。下面的重播查的是第 {r0} 到 {r1} 週。</p>
+<p class="lede">2008 年|第 {week_no(w0)} 到 {week_no(w1)} 週，每個點|是一週（週次|從週一|起算，不是 ISO 週次），滑鼠|移上去|看筆數。第 {RANGE_START_WEEK} 週|以後|最低的|是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆|不良，良率 {fmt_pct(low['yield_pct'])}。</p>
+<p class="lede">這不是|全期|最低。第 {RANGE_START_WEEK} 週|以前有 {data['earlier_lower_weeks']} 週|更低，其中|樣本|最少的|一週|只有 {data['earlier_min_runs']} 筆。下面的|重播|查的是|第 {r0} 到 {r1} 週。</p>
 {chart(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-sensors">
 <h2 id="h-sensors">可疑感測欄前 10 名</h2>
-<p class="lede">兩個模型各自排出前 10。表中的數字是重要度：把該欄的值打亂後，PR-AUC（看模型抓不良品抓得準不準的分數，亂猜時等於不良率）掉了多少，越大越可疑。</p>
-<p class="lede">橘底加 <span class="mk">◆</span> 的是兩邊都進前 10 的 {len(data['both'])} 欄：{both}。排名只代表這些欄和不良一起變動，不代表原因。隨機森林有 {len(data['rf_noisy'])} 欄（{noisy}）的標準差不小於平均，這些排名不可靠。</p>
+<p class="lede">兩個|模型|各自|排出|前 10。表中的|數字|是|重要度：把|該欄的|值|打亂後，PR-AUC（看|模型|抓|不良品|抓得|準不準|的分數，亂猜時|等於|不良率）掉了|多少，越大|越可疑。</p>
+<p class="lede">橘底|加 <span class="mk">◆</span> 的是|兩邊|都進|前 10 的 {len(data['both'])} 欄：{both}。排名|只代表|這些欄|和不良|一起|變動，不代表|原因。隨機森林|有 {len(data['rf_noisy'])} 欄（{noisy}）的|標準差|不小於|平均，這些|排名|不可靠。</p>
 {sensor_table(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-replay">
 <h2 id="h-replay">Agent 查詢重播</h2>
-<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 {sess_date}）。這段由腳本照 skill（寫給 AI 的作業說明檔，規定查詢步驟）的順序呼叫 MCP 伺服器，沒有語言模型參與；每步回應標的 isError 是工具回報這次有沒有出錯的欄位；呼叫順序與筆記內文都是事先寫死的。</p>
+<p class="lede">依序|點開|看請求|與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的|原樣|輸出（紀錄|產生於 {sess_date}）。這段|由腳本|照 skill（寫給 AI 的|作業|說明檔，規定|查詢|步驟）的|順序|呼叫 MCP 伺服器，沒有|語言模型|參與；每步|回應|標的 isError 是|工具|回報|這次|有沒有|出錯|的欄位；呼叫|順序|與|筆記|內文|都是|事先|寫死的。</p>
+<p class="hint">第 1 步已展開。方框內的長行|可以|左右滑動|看完整內容，右緣|有陰影|就代表|還有。</p>
 {replay_html(items)}
 </section>
 
 <section class="zone" aria-labelledby="h-limits">
 <h2 id="h-limits">限制與誠實聲明</h2>
-<p class="lede">先看結論：模型的效果只比「全猜良品」高一點，排名只是相關，不證明因果。</p>
+<p class="lede">先看|結論：模型的|效果|只比|「全猜良品」|高一點，排名|只是|相關，不證明|因果。</p>
 <div class="cards">
-<div class="card wide"><h3>模型只比「全猜良品」高一點</h3>
-<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆不良。全猜良品的 PR-AUC 就是不良率 {mdl['baseline']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}。</p>
+<div class="card wide"><h3>模型|只比|「全猜良品」|高一點</h3>
+<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆|不良。全猜良品的 PR-AUC 就是|不良率 {mdl['baseline']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}。</p>
 {models_table(data)}
-<p class="after">隨機森林的 ROC-AUC 是 {mdl['random_forest']['roc_auc']}（0.5 等於亂猜），這個模型不能拿來當自動判退的閘門。驗證段只有 {sp['val_fail']} 筆不良，選模型這一步本身就不穩：照事先定好的規則選到隨機森林，但在測試期它比邏輯迴歸差。測試期只有 {sp['test_fail']} 筆不良，指標的誤差很大。</p></div>
-<div class="card"><h3>相關不等於因果</h3>
-<p>前 10 名只能當排查順序的參考，沒有驗證過比隨機挑欄好，兩個模型的前 10 名只重疊 {len(data['both'])} 欄。</p>
-<p>感測欄是匿名的，沒有站別、機台、批號，所以回答不了「哪個站」，只給得出感測欄編號。時間戳是測試時間，不是各站的加工時間。</p></div>
-<div class="card"><h3>筆記只能是草稿</h3>
-<p>draft 閘門只在 MCP 工具層成立，前提是 Agent 只能透過這 {c['tools']} 個工具碰資料庫。Agent 若同時有 shell（能直接下指令的終端機）或檔案工具，就能直接改資料庫繞過閘門。</p>
-<p>確認筆記的步驟沒有做，要由人到現場確認。</p></div>
+<p class="after">隨機森林的 ROC-AUC 是 {mdl['random_forest']['roc_auc']}（0.5 等於|亂猜），這個|模型|不能|拿來|當|自動|判退的|閘門。驗證段|只有 {sp['val_fail']} 筆|不良，選模型|這一步|本身|就不穩：照|事先|定好的|規則|選到|隨機森林，但在|測試期|它比|邏輯迴歸|差。測試期|只有 {sp['test_fail']} 筆|不良，指標的|誤差|很大。</p></div>
+<div class="card"><h3>相關|不等於|因果</h3>
+<p>前 10 名|只能|當|排查|順序的|參考，沒有|驗證過|比隨機|挑欄|好，兩個|模型的|前 10 名|只重疊 {len(data['both'])} 欄。</p>
+<p>感測欄|是匿名的，沒有|站別、機台、批號，所以|回答不了|「哪個站」，只給得出|感測欄|編號。時間戳|是測試|時間，不是|各站的|加工|時間。</p></div>
+<div class="card"><h3>筆記|只能是|草稿</h3>
+<p>draft 閘門|只在 MCP 工具層|成立，前提是 Agent 只能|透過|這 {c['tools']} 個|工具|碰資料庫。Agent 若同時|有 shell（能|直接|下指令|的終端機）或|檔案|工具，就能|直接|改|資料庫|繞過|閘門。</p>
+<p>確認|筆記的|步驟|沒有做，要由|人|到現場|確認。</p></div>
 </div>
 </section>
 
 <footer>
-<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="{UCI_URL}">doi:10.24432/C54305</a>，授權 <a href="{LICENSE_URL}">CC BY 4.0</a>。本頁只含由這份資料算出的衍生結果。</p>
-<p>頁面由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="{REPO_URL}">原始碼（GitHub）</a></p>
+<p>資料：McCann &amp; Johnston (2008), SECOM, UCI Machine Learning Repository，<a href="{UCI_URL}">doi:10.24432/C54305</a>，授權 <a href="{LICENSE_URL}">CC BY 4.0</a>。本頁|只含|由這份|資料|算出的|衍生|結果。</p>
+<p>頁面|由 <span class="mono">scripts/build_demo_page.py</span> 從 <span class="mono">reports/</span>、資料庫|與 <span class="mono">demo/mcp_session.md</span> 產生。<a href="{REPO_URL}">原始碼（GitHub）</a></p>
 </footer>
 </main>
 <script type="application/json" id="demo-data">{blob}</script>
@@ -453,7 +467,7 @@ def build() -> str:
     calls = parse_session(src["session"])
     data = build_data(src, calls)
     items = replay_items(calls, data["low_week"])
-    return render(data, items, session_date(src["session"]))
+    return apply_wbr(render(data, items, session_date(src["session"])))
 
 
 def main() -> None:

@@ -18,7 +18,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 PAGE_PATH = ROOT / "docs" / "demo" / "index.html"
 DB_PATH = ROOT / "data" / "secom.db"
-PAGE = PAGE_PATH.read_text(encoding="utf-8")
+PAGE_RAW = PAGE_PATH.read_text(encoding="utf-8")
+PAGE = PAGE_RAW.replace("<wbr>", "")  # word-boundary hints stripped so text assertions read as plain prose
 METRICS_TEXT = (ROOT / "reports" / "metrics.json").read_text(encoding="utf-8")
 METRICS = json.loads(METRICS_TEXT)
 CLEANING = (ROOT / "reports" / "cleaning.md").read_text(encoding="utf-8")
@@ -193,7 +194,7 @@ def test_replay_shows_the_session_json_verbatim():
     for k, block in enumerate(blocks):
         for body in re.findall(r"```json\n(.*?)```", block, re.S)[:2]:
             assert escape(body.rstrip("\n")) in PAGE, f"call {k + 1}: JSON body not shown verbatim"
-    assert PAGE.count("<details>") == 7
+    assert PAGE.count("<details") == 7
 
 
 @pytest.mark.skipif(not DB_PATH.exists(), reason="data/secom.db not built")
@@ -201,7 +202,7 @@ def test_build_is_deterministic_and_committed_page_is_current():
     b = _builder()
     first, second = b.build(), b.build()
     assert hashlib.sha256(first.encode()).hexdigest() == hashlib.sha256(second.encode()).hexdigest()
-    assert first == PAGE, "docs/demo/index.html is stale; rerun python scripts/build_demo_page.py"
+    assert first == PAGE_RAW, "docs/demo/index.html is stale; rerun python scripts/build_demo_page.py"
 
 
 # ---- D2: zero external requests ----------------------------------------------------------
@@ -382,3 +383,69 @@ def test_docs_folder_holds_only_the_published_files():
     found = {p.relative_to(ROOT).as_posix() for p in (ROOT / "docs").rglob("*") if p.is_file()}
     assert found == {"docs/domain.md", "docs/demo/index.html", "docs/.nojekyll"}
     assert (ROOT / "docs" / ".nojekyll").read_bytes() == b""
+
+
+# ---- T-105: a word is never broken across two lines ----------------------------------------
+
+def _css() -> str:
+    return re.search(r"<style>(.*?)</style>", PAGE_RAW, re.S).group(1)
+
+
+def _prose_blocks() -> list[str]:
+    """Inner HTML of every text block outside <pre>: paragraphs, headings, summaries."""
+    body = re.sub(r"<(pre|script|style)\b.*?</\1>", " ", PAGE_RAW, flags=re.S)
+    return re.findall(r"<(?:p|h1|h2|h3|span class=\"sum\")\b[^>]*>(.*?)</(?:p|h1|h2|h3|span)>", body, re.S)
+
+
+def test_body_uses_keep_all_so_cjk_only_breaks_at_marked_places():
+    body_rule = re.search(r"(?<![\w.])body\{([^}]*)\}", _css()).group(1)
+    assert "word-break:keep-all" in body_rule
+    assert "overflow-wrap:break-word" in body_rule  # a too-long run still wraps instead of widening the page
+
+
+def test_no_marked_break_falls_inside_a_word():
+    terms = ["良率", "感測欄", "半導體", "製程", "資料集", "不良", "良品", "閘門", "邏輯迴歸", "隨機森林", "重要度",
+             "中位數", "標準差", "平均差", "語言模型", "資料庫", "工具", "筆記", "因果", "測試期", "驗證段", "全猜良品"]
+    for t in terms:
+        for i in range(1, len(t)):
+            assert t[:i] + "<wbr>" + t[i:] not in PAGE_RAW, f"<wbr> splits the word {t}"
+
+
+def test_every_prose_block_has_a_break_opportunity_at_least_every_nine_cjk_chars():
+    """With keep-all a CJK run only breaks at punctuation, spaces or <wbr>; cap the unbroken run so lines can still wrap."""
+    blocks = _prose_blocks()
+    assert len(blocks) >= 20
+    for html in blocks:
+        text = re.sub(r"<(?!wbr)[^>]+>", "", html)
+        text = unescape(text)
+        for run in re.split(r"<wbr>|[^\u4e00-\u9fff]", text):
+            assert len(run) <= 9, f"unbroken run of {len(run)} chars: {run!r}"
+
+
+def test_number_and_unit_are_kept_on_one_line():
+    body = re.sub(r"<(pre|script|style)\b.*?</\1>", " ", PAGE_RAW, flags=re.S)
+    body = re.sub(r"<span class=\"nb\">.*?</span>", "", body, flags=re.S)  # already-protected spans
+    body = re.sub(r"<[^>]+>", "", body)
+    loose = re.findall(r"\d+ (?:週|筆|欄|個|名|步)", unescape(body))
+    assert not loose, f"number and unit can be split across lines: {loose[:5]}"
+    assert '<span class="nb">第 34 週</span>' in PAGE_RAW
+
+
+# ---- T-106: the replay starts with its first step open ------------------------------------
+
+def test_replay_first_step_is_open_by_default_and_only_the_first():
+    tags = re.findall(r"<details( open)?>", PAGE_RAW)
+    assert len(tags) == 7
+    assert tags[0] == " open" and all(t == "" for t in tags[1:])
+
+
+# ---- T-107: a JSON line cut at the right edge is visibly cut ------------------------------
+
+def test_json_blocks_show_a_scroll_shadow_and_a_swipe_hint():
+    pre = re.search(r"(?<![\w.])pre\{([^}]*)\}", _css()).group(1)
+    assert "background-attachment:local,local,scroll,scroll" in pre  # shadow only while content remains on the right
+    assert pre.count("linear-gradient") == 4
+    assert "overflow-x:auto" in pre  # D4: scrolls inside the block, never widens the page
+    hint = re.search(r'<p class="hint">(.*?)</p>', PAGE, re.S).group(1)
+    assert "左右滑動" in hint
+    assert PAGE.index('class="hint"') < PAGE.index('<ol class="replay">')
