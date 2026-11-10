@@ -232,3 +232,101 @@ def test_both_selected_tag_has_enough_contrast():
 
     hi, lo = sorted((lum(fg), lum(bg)), reverse=True)
     assert (hi + 0.05) / (lo + 0.05) >= 4.5
+
+
+# ---- review r1 fixes: recomputed derived numbers, expanded-state layout, escaping, Pages surface ----
+
+def _independent_derived():
+    """Recompute the derived page numbers from weeks and metrics without the builder's own code paths."""
+    d = _data()
+    weeks = d["weeks"]
+    low = min((w for w in weeks if int(w["week"].split("-W")[1]) >= 34), key=lambda w: w["yield_pct"])
+    early = [w for w in weeks if int(w["week"].split("-W")[1]) < 34]
+    rf = METRICS["permutation_importance"]["top10"]["random_forest"]
+    block = SESSION.split("## tools/call `yield_by_week`")[1].split("## tools/call")[0]
+    resp = json.loads(re.findall(r"```json\n(.*?)```", block, re.S)[1])
+    wk = [int(w["week"].split("-W")[1]) for w in resp["weeks"]]
+    return {
+        "earlier_lower_weeks": sum(1 for w in early if w["yield_pct"] < low["yield_pct"]),
+        "earlier_min_runs": min(w["runs"] for w in early),
+        "rf_noisy": [s["sensor"] for s in rf if s["importance_std"] >= s["importance_mean"]],
+        "replay_weeks": [min(wk), max(wk)],
+    }
+
+
+def test_derived_numbers_are_recomputed_from_weeks_and_metrics_and_shown_on_page():
+    want = _independent_derived()
+    d = _data()
+    for key, val in want.items():
+        assert d[key] == val, key
+    text = re.sub(r"\s+", "", _visible_text(PAGE))
+    assert f"第34週以前有{want['earlier_lower_weeks']}週更低" in text
+    assert f"樣本最少的一週只有{want['earlier_min_runs']}筆" in text
+    lo, hi = want["replay_weeks"]
+    assert f"重播查的是第{lo}到{hi}週" in text
+    assert f"隨機森林有{len(want['rf_noisy'])}欄（{'、'.join(want['rf_noisy'])}）的標準差不小於平均" in text
+    assert want["earlier_lower_weeks"] > 0 and want["rf_noisy"]  # guards against a vacuous pass
+
+
+def test_week_numbering_is_stated_as_monday_based():
+    assert "週次從週一起算，不是 ISO 週次" in _visible_text(PAGE)
+
+
+def test_first_use_of_jargon_has_a_plain_explanation():
+    text = _visible_text(PAGE)
+    for term, gloss in (("skill", "skill（寫給 AI 的作業說明檔"), ("shell", "shell（能直接下指令的終端機）"), ("isError", "isError 是工具回報")):
+        assert text.index(gloss) <= text.index(term), term
+
+
+def test_hero_names_where_the_numbers_come_from():
+    assert "取自資料庫、訓練報告與工具的實際回傳" in PAGE
+
+
+def test_expanded_json_stays_inside_the_panel():
+    """C1: a long JSON line must scroll inside its own <pre>, not widen the page (grid item min-width:auto)."""
+    css = re.search(r"<style>(.*?)</style>", PAGE, re.S).group(1)
+    assert re.search(r"\.io\{[^}]*grid-template-columns:minmax\(0,1fr\)", css)
+    pre = re.search(r"(?<![\w.])pre\{([^}]*)\}", css).group(1)
+    assert "overflow-x:auto" in pre and "max-width:100%" in pre and "white-space:pre" in pre
+    assert re.search(r"\.zone\{[^}]*min-width:0", css)
+
+
+# ---- escaping ----
+
+@pytest.mark.skipif(not DB_PATH.exists(), reason="data/secom.db not built")
+def test_every_interpolated_source_string_is_escaped():
+    import copy
+    b = _builder()
+    src = b.read_sources()
+    src["metrics"] = copy.deepcopy(src["metrics"])
+    top = src["metrics"]["permutation_importance"]["top10"]
+    top["random_forest"][0]["sensor"] = "<x>"
+    top["logreg"][0]["sensor"] = "<x>"  # shared name, so it also reaches the "both" sentence
+    top["logreg"][1]["importance_mean"] = '"><img src=x onerror=1>'
+    src["metrics"]["models"]["logreg"]["test"]["pr_auc"] = "<b>1</b>"
+    calls = b.parse_session(src["session"])
+    html = b.render(b.build_data(src, calls), b.replay_items(calls, b.low_week(src["weeks"])), b.session_date(src["session"]))
+    outside = re.sub(r'<script type="application/json".*?</script>', "", html, flags=re.S)
+    assert "<x>" not in outside and "&lt;x&gt;" in outside
+    assert "<img" not in outside and "<b>1" not in outside
+    assert outside.count("<script") == 0
+
+
+# ---- Pages surface ----
+
+def test_csp_and_referrer_meta_are_present():
+    m = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)"', PAGE)
+    assert m, "CSP meta missing"
+    policy = m.group(1)
+    for directive in ("default-src 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'none'", "style-src 'unsafe-inline'"):
+        assert directive in policy
+    assert "script-src" not in policy and "'unsafe-eval'" not in policy
+    assert '<meta name="referrer" content="no-referrer">' in PAGE
+    assert re.search(r'<meta name="robots" content="[^"]+">', PAGE)
+
+
+def test_docs_folder_holds_only_the_published_files():
+    """docs/ is the Pages root: anything put here becomes public, so a new file must be added to this list on purpose."""
+    found = {p.relative_to(ROOT).as_posix() for p in (ROOT / "docs").rglob("*") if p.is_file()}
+    assert found == {"docs/domain.md", "docs/demo/index.html", "docs/.nojekyll"}
+    assert (ROOT / "docs" / ".nojekyll").read_bytes() == b""

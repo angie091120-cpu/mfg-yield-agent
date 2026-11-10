@@ -68,6 +68,17 @@ def read_sources() -> dict:
     }
 
 
+def esc_tree(x):
+    """Return a copy of x with every string HTML-escaped; numbers pass through. Used for all visible-page interpolation."""
+    if isinstance(x, str):
+        return escape(x)
+    if isinstance(x, dict):
+        return {k: esc_tree(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [esc_tree(v) for v in x]
+    return x
+
+
 def week_no(week: str) -> int:
     return int(week.split("-W")[1])
 
@@ -102,7 +113,7 @@ def low_week(weeks: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- page data
 
-def build_data(src: dict) -> dict:
+def build_data(src: dict, calls: list[dict]) -> dict:
     m = src["metrics"]
     c = src["counts"]
     weeks = src["weeks"]
@@ -122,10 +133,12 @@ def build_data(src: dict) -> dict:
                           "tp": m["models"]["random_forest"]["test"]["confusion"]["tp"], "fp": m["models"]["random_forest"]["test"]["confusion"]["fp"]},
     }
     sp = m["split"]
+    replay_wk = [week_no(w["week"]) for w in calls[0]["response"]["weeks"]]
     return {
         "counts": c,
         "weeks": weeks,
         "low_week": low,
+        "replay_weeks": [min(replay_wk), max(replay_wk)],
         "earlier_lower_weeks": len(earlier_lower),
         "earlier_min_runs": min(w["runs"] for w in weeks if week_no(w["week"]) < RANGE_START_WEEK),
         "top10": {"random_forest": rf, "logreg": lr},
@@ -186,6 +199,7 @@ th.rank{width:3.4em;white-space:nowrap}
 td.hit{background:var(--accent-bg)}
 td .v{color:var(--muted);font-size:13.5px;margin-left:6px}
 td.hit .v{color:#5B3A14}
+.mk{color:var(--accent)}
 .tag{display:block;font-size:13px;color:var(--accent-ink);font-weight:700;white-space:nowrap;line-height:1.5}
 ol.replay{list-style:none;margin:0;padding:0}
 ol.replay li{border-bottom:1px solid var(--line)}
@@ -198,9 +212,9 @@ details[open]>summary::after{transform:rotate(-135deg);top:1.5em}
 .stepno.try{background:#fff;color:var(--primary);box-shadow:inset 0 0 0 2px var(--primary)}
 .nm{font-weight:700;color:var(--primary);font-size:14.5px}
 .sum{color:var(--muted);font-size:14px;flex:1 1 220px;min-width:0}
-.io{margin:0 0 14px;display:grid;gap:10px}
+.io{margin:0 0 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 .io h4{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:500}
-pre{margin:0;padding:12px 14px;background:var(--code);border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow:auto;max-height:320px;max-width:100%;tab-size:2}
+pre{margin:0;padding:12px 14px;background:var(--code);border-radius:8px;font:400 13px/1.65 var(--mono);white-space:pre;overflow-x:auto;overflow-y:auto;max-height:320px;max-width:100%;tab-size:2}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .card{background:var(--bg);border-radius:8px;padding:16px 18px;font-size:15px;min-width:0}
 .card.wide{grid-column:1/-1}
@@ -292,14 +306,14 @@ def sensor_table(data: dict) -> str:
             f'<tbody>{rows}</tbody></table></div>')
 
 
-def replay_items(calls: list[dict]) -> list[dict]:
+def replay_items(calls: list[dict], low: dict) -> list[dict]:
     """One entry per tools/call block, with a one-line summary taken from that call's own response."""
     by = calls
     yb, ts, c103, c035, note, gate, inj = by[0], by[1], by[2], by[3], by[4], by[5], by[6]
-    w39 = next(w for w in yb["response"]["weeks"] if w["week"] == "2008-W39")
+    lw = next(w for w in yb["response"]["weeks"] if w["week"] == low["week"])
     r = yb["request"]
     items = [
-        (yb, f"查 {r['start']} 到 {r['end']}；W39 {w39['runs']} 筆、{w39['fails']} 筆不良，良率 {w39['yield_pct']}%"),
+        (yb, f"查 {r['start']} 到 {r['end']}；W{week_no(lw['week'])} {lw['runs']} 筆、{lw['fails']} 筆不良，良率 {lw['yield_pct']}%"),
         (ts, f"取前 {ts['request']['n']} 名；第 1 名 {ts['response']['sensors'][0]['sensor']}，重要度 {ts['response']['sensors'][0]['importance_mean']}"),
         (c103, f"{c103['request']['sensor']}：不良組中位數 {c103['response']['fail']['median']}，良品組 {c103['response']['pass']['median']}；"
                f"標準化平均差 {c103['response']['std_mean_diff_fail_minus_pass']}（兩組平均值的差，用標準差當單位）"),
@@ -346,23 +360,29 @@ def models_table(data: dict) -> str:
 
 
 def render(data: dict, items: list[dict], sess_date: str) -> str:
+    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).replace("</", "<\\/")
+    data = esc_tree(data)  # everything below is page text: escape once, here
+    sess_date = escape(sess_date)
     c, low, sp, mdl = data["counts"], data["low_week"], data["split"], data["models"]
     both = "、".join(data["both"])
     noisy = "、".join(data["rf_noisy"])
     w0, w1 = data["weeks"][0]["week"], data["weeks"][-1]["week"]
+    r0, r1 = data["replay_weeks"]
     desc = (f"用 {c['runs']} 筆半導體製程紀錄查良率的 Agent 作品展示：每週良率、可疑感測欄、"
             "工具呼叫重播，以及模型的限制。")
     h1 = chunks([f'用 <span class="n">{c["runs"]}</span> 筆', "半導體製程紀錄，",
                  f'把 <span class="n">{c["sensors_before"]}</span> 個', "感測欄",
                  f'清成 <span class="n">{c["sensors_after"]}</span> 個，',
                  f'再交給 <span class="n">{c["tools"]}</span> 個', "工具查良率。"])
-    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).replace("</", "<\\/")
     return f"""<!doctype html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SECOM 良率查詢｜製程良率異常分析 Agent 作品展示</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="index,follow">
 <meta name="description" content="{escape(desc)}">
 <meta name="theme-color" content="#20329B">
 <meta property="og:type" content="website">
@@ -377,27 +397,27 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 
 <section class="hero" aria-labelledby="h-hero">
 <h1 id="h-hero">{h1}</h1>
-<p>這是一個良率查詢 Agent（讓 AI 照指定順序呼叫工具、自己查資料的程式），查的是 UCI 公開的 SECOM 半導體製程資料集。它透過 MCP（讓 AI 呼叫外部工具的通訊規則）連到資料庫。下面的數字取自資料庫與工具的實際回傳。</p>
+<p>這是一個良率查詢 Agent（讓 AI 照指定順序呼叫工具、自己查資料的程式），查的是 UCI 公開的 SECOM 半導體製程資料集。它透過 MCP（讓 AI 呼叫外部工具的通訊規則）連到資料庫。下面的數字取自資料庫、訓練報告與工具的實際回傳。</p>
 <p class="links"><a href="{REPO_URL}">原始碼（GitHub）</a></p>
 </section>
 
 <section class="zone" aria-labelledby="h-yield">
 <h2 id="h-yield">每週良率</h2>
-<p class="lede">2008 年第 {week_no(w0)} 到 {week_no(w1)} 週，每個點是一週，滑鼠移上去看筆數。第 {RANGE_START_WEEK} 週以後最低的是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆不良，良率 {fmt_pct(low['yield_pct'])}。</p>
-<p class="lede">這不是全期最低。第 {RANGE_START_WEEK} 週以前有 {data['earlier_lower_weeks']} 週更低，其中樣本最少的一週只有 {data['earlier_min_runs']} 筆。下面的重播查的是第 37 到 41 週。</p>
+<p class="lede">2008 年第 {week_no(w0)} 到 {week_no(w1)} 週，每個點是一週（週次從週一起算，不是 ISO 週次），滑鼠移上去看筆數。第 {RANGE_START_WEEK} 週以後最低的是第 {week_no(low['week'])} 週：{low['runs']} 筆中 {low['fails']} 筆不良，良率 {fmt_pct(low['yield_pct'])}。</p>
+<p class="lede">這不是全期最低。第 {RANGE_START_WEEK} 週以前有 {data['earlier_lower_weeks']} 週更低，其中樣本最少的一週只有 {data['earlier_min_runs']} 筆。下面的重播查的是第 {r0} 到 {r1} 週。</p>
 {chart(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-sensors">
 <h2 id="h-sensors">可疑感測欄前 10 名</h2>
 <p class="lede">兩個模型各自排出前 10。表中的數字是重要度：把該欄的值打亂後，PR-AUC（看模型抓不良品抓得準不準的分數，亂猜時等於不良率）掉了多少，越大越可疑。</p>
-<p class="lede">橘底加 ◆ 的是兩邊都進前 10 的 {len(data['both'])} 欄：{both}。排名只代表這些欄和不良一起變動，不代表原因。隨機森林有 {len(data['rf_noisy'])} 欄（{noisy}）的標準差不小於平均，這些排名不可靠。</p>
+<p class="lede">橘底加 <span class="mk">◆</span> 的是兩邊都進前 10 的 {len(data['both'])} 欄：{both}。排名只代表這些欄和不良一起變動，不代表原因。隨機森林有 {len(data['rf_noisy'])} 欄（{noisy}）的標準差不小於平均，這些排名不可靠。</p>
 {sensor_table(data)}
 </section>
 
 <section class="zone" aria-labelledby="h-replay">
 <h2 id="h-replay">Agent 查詢重播</h2>
-<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 {sess_date}）。這段由腳本照 skill 規定的順序呼叫 MCP 伺服器，沒有語言模型參與；呼叫順序與筆記內文都是事先寫死的。</p>
+<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 {sess_date}）。這段由腳本照 skill（寫給 AI 的作業說明檔，規定查詢步驟）的順序呼叫 MCP 伺服器，沒有語言模型參與；每步回應標的 isError 是工具回報「這次有沒有出錯」的欄位；呼叫順序與筆記內文都是事先寫死的。</p>
 {replay_html(items)}
 </section>
 
@@ -406,14 +426,14 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 <p class="lede">先看結論：模型的效果只比「全猜良品」高一點，排名只是相關，不證明因果。</p>
 <div class="cards">
 <div class="card wide"><h3>模型只比「全猜良品」高一點</h3>
-<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆不良。全猜良品的 PR-AUC 就是不良率 {mdl['baseline']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}。</p>
+<p>測試期 {sp['test_rows']} 筆，其中 {sp['test_fail']} 筆不良。全猜良品的 PR-AUC 就是不良率 {mdl['baseline']['pr_auc']}，邏輯迴歸 {mdl['logreg']['pr_auc']}，隨機森林 {mdl['random_forest']['pr_auc']}。</p>
 {models_table(data)}
 <p class="after">隨機森林的 ROC-AUC 是 {mdl['random_forest']['roc_auc']}（0.5 等於亂猜），這個模型不能拿來當自動判退的閘門。驗證段只有 {sp['val_fail']} 筆不良，選模型這一步本身就不穩：照事先定好的規則選到隨機森林，但在測試期它比邏輯迴歸差。測試期只有 {sp['test_fail']} 筆不良，指標的誤差很大。</p></div>
 <div class="card"><h3>相關不等於因果</h3>
 <p>前 10 名只能當排查順序的參考，沒有驗證過比隨機挑欄好，兩個模型的前 10 名只重疊 {len(data['both'])} 欄。</p>
 <p>感測欄是匿名的，沒有站別、機台、批號，所以回答不了「哪個站」，只給得出感測欄編號。時間戳是測試時間，不是各站的加工時間。</p></div>
 <div class="card"><h3>筆記只能是草稿</h3>
-<p>draft 閘門只在 MCP 工具層成立，前提是 Agent 只能透過這 {c['tools']} 個工具碰資料庫。Agent 若同時有 shell 或檔案工具，就能直接改資料庫繞過閘門。</p>
+<p>draft 閘門只在 MCP 工具層成立，前提是 Agent 只能透過這 {c['tools']} 個工具碰資料庫。Agent 若同時有 shell（能直接下指令的終端機）或檔案工具，就能直接改資料庫繞過閘門。</p>
 <p>確認筆記的步驟沒有做，要由人到現場確認。</p></div>
 </div>
 </section>
@@ -431,9 +451,9 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 
 def build() -> str:
     src = read_sources()
-    data = build_data(src)
     calls = parse_session(src["session"])
-    items = replay_items(calls)
+    data = build_data(src, calls)
+    items = replay_items(calls, data["low_week"])
     return render(data, items, session_date(src["session"]))
 
 
