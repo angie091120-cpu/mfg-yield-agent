@@ -251,8 +251,9 @@ def chunks(parts: list[str]) -> str:
 
 
 # Word-boundary source of truth. Every BREAK ("¦") written in a prose template must sit between two words from
-# BREAK_WORDS (multi-character words) or BREAK_SINGLES (one-character function words and counters); tests/test_demo_page.py
-# checks each <wbr> in the page against these two lists and rejects a break that cuts a listed word in two.
+# BREAK_WORDS (multi-character words) or BREAK_SINGLES (one-character function words and counters); both lists hold no
+# duplicates. tests/test_demo_page.py rejects any <wbr> that lands inside an occurrence of a BREAK_WORDS word in the page
+# text (a break between the two halves of such a word), apart from the explicit exemptions listed in that test.
 BREAK = "¦"
 BREAK_WORDS = (
     "下面 數字 取自 資料庫 重播 不代表 原因 不是 各站 加工 時間 不良組 不良 中位數 不證明 因果 亂猜 等於 不良率 以後 最低 "
@@ -263,11 +264,11 @@ BREAK_WORDS = (
     "標的 沒有 執行 站別 語言模型 參與 驗證 比隨機 挑欄 滑鼠 移上去 看筆數 指定 標準差 單位 作業 說明檔 原樣 輸出 調查 "
     "不小於 平均 兩邊 不等於 不良品 抓得 準不準 分數 確認 步驟 草稿 紀錄 產生於 下指令 終端機 自己 查資料 程式 若同時 "
     "到現場 規定 查詢 硬塞 越大 可疑 全期 不可靠 拿來 自動 判退 腳本 這段 這是 一個 這個 週次 從週一 起算 這一步 本身 "
-    "就不穩 選模型 隨機森林 頁面 驗證段 重要度 訓練報告 實際回傳 資料 算出 表中 該欄 一週 還有 衍生 這些 只在 隨機 挑欄 "
-    "當單位 內的 由這份 由腳本 要由 兩組 兩邊 都進 錯誤 順序 說明 檔案 平均值 規則 事先 筆數 "
-    "不能 亂猜 以前 只含 重疊 定好 指標 所以 更低 本頁 橘底 每步 清成 良品組 良品 良率 連到 選到 可疑"
+    "就不穩 選模型 隨機森林 頁面 驗證段 重要度 訓練報告 實際回傳 資料 算出 表中 該欄 這些 只在 隨機 "
+    "當單位 內的 由這份 由腳本 要由 兩組 都進 錯誤 說明 筆數 "
+    "不能 以前 只含 重疊 定好 指標 所以 更低 本頁 橘底 每步 清成 良品組 良品 良率 連到 選到"
 ).split()
-BREAK_SINGLES = "的是與和或把值當差好看抓改等做人前到年有在由照用加比也都就能但它比個名筆週欄步查帶後這那些各只時第碰回越過含"
+BREAK_SINGLES = "的是與和或把值當差好看抓改等做人前到年有在由照用加比也都就能但它個名筆週欄步查帶後這那些各只時第碰回越過含"
 
 
 def apply_wbr(html: str) -> str:

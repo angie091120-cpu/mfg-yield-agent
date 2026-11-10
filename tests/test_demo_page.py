@@ -494,9 +494,11 @@ def test_page_text_collector_reaches_every_kind_of_block():
 def test_no_marked_break_falls_inside_a_word():
     """M2: every <wbr> sits on a word boundary of the generator's dictionary (BREAK_WORDS + BREAK_SINGLES).
 
-    Each piece between two breaks must be fully made of listed words, and two one-character entries may not be the halves of a listed word,
-    so a break cut into a word such as 模|型 (or one inside a word nobody thought to list) fails."""
+    Each piece between two breaks must be fully made of listed words, and no break may fall inside an occurrence of a
+    BREAK_WORDS word in the page text (left and right side together form part of a listed word), so a cut such as 模|型 or
+    平均|值 fails. The only exceptions are the explicit entries of ALLOWED_INSIDE."""
     b = _builder()
+    assert len(set(b.BREAK_WORDS)) == len(b.BREAK_WORDS) and len(set(b.BREAK_SINGLES)) == len(b.BREAK_SINGLES)  # Minor 3
     words = sorted(set(b.BREAK_WORDS), key=len, reverse=True)
     singles = set(b.BREAK_SINGLES)
 
@@ -511,11 +513,8 @@ def test_no_marked_break_falls_inside_a_word():
                         ok[i + len(w)] = True
         return ok[-1]
 
-    def ends_with_word(piece: str) -> bool:
-        return any(piece.endswith(w) and segmentable(piece[:-len(w)]) for w in words)
-
-    def starts_with_word(piece: str) -> bool:
-        return any(piece.startswith(w) and segmentable(piece[len(w):]) for w in words)
+    # (listed word, "left|right" of the break) pairs where the break is on a real boundary although a listed word spans it
+    ALLOWED_INSIDE: set[tuple[str, str]] = {("一起", "從週一|起算")}  # 從週一 / 起算 are two words; 一起 only appears by chance
 
     checked = 0
     for block in _prose_blocks():
@@ -530,14 +529,28 @@ def test_no_marked_break_falls_inside_a_word():
                 cuts.append(pos)
             for piece in pieces:
                 assert not piece or segmentable(piece), f"piece {piece!r} (in {run!r}) is not made of listed words"
-            # two one-character entries side by side may be the two halves of a listed word (只|能 for 只能)
-            for k in range(len(pieces) - 1):
-                left, right = pieces[k], pieces[k + 1]
-                if left and right and not ends_with_word(left) and not starts_with_word(right):
-                    pair = left[-1] + right[0]
-                    assert not any(pair in w for w in words), f"<wbr> may cut a word at {pair!r} in {run!r}"
+            for cut in cuts:
+                for w in words:
+                    start = plain.find(w)
+                    while start != -1:
+                        if start < cut < start + len(w):
+                            key = (w, f"{plain[:cut][-3:]}|{plain[cut:][:3]}")
+                            assert key in ALLOWED_INSIDE, f"<wbr> cuts the word {w!r} in {run!r} at {key[1]!r}"
+                        start = plain.find(w, start + 1)
             checked += len(cuts)
     assert checked >= 200
+
+
+def test_no_marked_break_falls_inside_an_english_word():
+    """Minor 1: a <wbr> with a Latin letter on both sides (Ag|ent) would split an English word."""
+    for block in _prose_blocks():
+        assert not re.search(r"[A-Za-z]<wbr>[A-Za-z]", block), f"break inside an English word: {block!r}"
+
+
+def test_old_pipe_break_marker_is_gone_from_prose():
+    """Minor 2: the retired '|' break marker must not survive as visible text in any prose block."""
+    for block in _prose_blocks():
+        assert "|" not in block, f"old break marker left in prose: {block!r}"
 
 
 def test_break_marker_is_applied_only_to_template_prose():
