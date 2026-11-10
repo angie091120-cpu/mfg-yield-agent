@@ -146,7 +146,6 @@ def build_data(src: dict, calls: list[dict]) -> dict:
         "rf_noisy": noisy,
         "models": models,
         "split": {"test_rows": sp["test_rows"], "test_fail": sp["test_fail"], "val_fail": sp["val_fail"]},
-        "test_fail_rate": m["baseline_all_pass"]["pr_auc"],
     }
 
 
@@ -417,7 +416,7 @@ def render(data: dict, items: list[dict], sess_date: str) -> str:
 
 <section class="zone" aria-labelledby="h-replay">
 <h2 id="h-replay">Agent 查詢重播</h2>
-<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 {sess_date}）。這段由腳本照 skill（寫給 AI 的作業說明檔，規定查詢步驟）的順序呼叫 MCP 伺服器，沒有語言模型參與；每步回應標的 isError 是工具回報「這次有沒有出錯」的欄位；呼叫順序與筆記內文都是事先寫死的。</p>
+<p class="lede">依序點開看請求與回應，內容是 <span class="mono">demo/mcp_session.md</span> 的原樣輸出（紀錄產生於 {sess_date}）。這段由腳本照 skill（寫給 AI 的作業說明檔，規定查詢步驟）的順序呼叫 MCP 伺服器，沒有語言模型參與；每步回應標的 isError 是工具回報這次有沒有出錯的欄位；呼叫順序與筆記內文都是事先寫死的。</p>
 {replay_html(items)}
 </section>
 

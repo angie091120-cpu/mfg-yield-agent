@@ -97,7 +97,8 @@ def test_low_week_is_lowest_from_week_34_and_not_claimed_as_global_minimum():
 def test_models_sensors_and_split_match_metrics_json():
     d = _data()
     m = METRICS
-    assert d["models"]["baseline"]["pr_auc"] == m["baseline_all_pass"]["pr_auc"]
+    b = m["baseline_all_pass"]
+    assert d["models"]["baseline"] == {"pr_auc": b["pr_auc"], "tp": b["confusion"]["tp"], "fp": b["confusion"]["fp"]}
     for key in ("logreg", "random_forest"):
         t = m["models"][key]["test"]
         got = d["models"][key]
@@ -109,6 +110,52 @@ def test_models_sensors_and_split_match_metrics_json():
     lr = {s["sensor"] for s in d["top10"]["logreg"]}
     assert set(d["both"]) == rf & lr and len(d["both"]) == 3
     assert d["split"] == {"test_rows": m["split"]["test_rows"], "test_fail": m["split"]["test_fail"], "val_fail": m["split"]["val_fail"]}
+
+
+def test_every_embedded_key_has_its_own_source_check():
+    """Each key of the page JSON is compared to a value rebuilt from the sources; an unlisted key fails."""
+    d = _data()
+    m = METRICS
+    b = m["baseline_all_pass"]
+    top = m["permutation_importance"]["top10"]
+
+    def tops(key):
+        return [{"sensor": s["sensor"], "mean": s["importance_mean"], "std": s["importance_std"]} for s in top[key]]
+
+    def model(key):
+        t = m["models"][key]["test"]
+        return {"pr_auc": t["pr_auc"], "roc_auc": t["roc_auc"], "tp": t["confusion"]["tp"], "fp": t["confusion"]["fp"]}
+
+    runs = int(re.search(r"筆數（runs）\s*\|\s*(\d+)", CLEANING).group(1))
+    before, after = map(int, re.search(r"感測欄數\s*\|\s*(\d+)\s*\|\s*(\d+)", CLEANING).groups())
+    tools = json.loads(re.search(r"## tools/list\s+```json\n(.*?)```", SESSION, re.S).group(1))
+    derived = _independent_derived()
+    later = [w for w in d["weeks"] if int(w["week"].split("-W")[1]) >= 34]
+    rf_names = {s["sensor"] for s in top["random_forest"]}
+    lr_names = {s["sensor"] for s in top["logreg"]}
+    expected = {
+        "counts": {"runs": runs, "sensors_before": before, "sensors_after": after, "tools": len(tools)},
+        "top10": {"random_forest": tops("random_forest"), "logreg": tops("logreg")},
+        "both": [s["sensor"] for s in top["random_forest"] if s["sensor"] in lr_names],
+        "models": {"baseline": {"pr_auc": b["pr_auc"], "tp": b["confusion"]["tp"], "fp": b["confusion"]["fp"]},
+                   "logreg": model("logreg"), "random_forest": model("random_forest")},
+        "split": {"test_rows": m["split"]["test_rows"], "test_fail": m["split"]["test_fail"], "val_fail": m["split"]["val_fail"]},
+        "low_week": min(later, key=lambda w: w["yield_pct"]),
+        "earlier_lower_weeks": derived["earlier_lower_weeks"],
+        "earlier_min_runs": derived["earlier_min_runs"],
+        "rf_noisy": derived["rf_noisy"],
+        "replay_weeks": derived["replay_weeks"],
+    }
+    assert set(expected["both"]) == rf_names & lr_names
+    # weeks: totals from the cleaning report, shape fixed (rows vs the database and session are checked in their own tests)
+    total_fail = int(re.search(r"全體 [\d.]+%（(\d+) 筆）", CLEANING).group(1))
+    assert sum(w["runs"] for w in d["weeks"]) == runs and sum(w["fails"] for w in d["weeks"]) == total_fail
+    assert all(set(w) == {"week", "runs", "fails", "yield_pct"} for w in d["weeks"])
+    expected["weeks"] = d["weeks"]
+    missing = set(d) - set(expected)
+    assert not missing, f"keys in the page JSON with no independent source check: {sorted(missing)}"
+    for key in d:
+        assert d[key] == expected[key], key
 
 
 def test_page_does_not_overstate_the_model():
@@ -124,8 +171,13 @@ def test_page_does_not_overstate_the_model():
 def test_every_visible_number_traces_to_a_source_or_the_embedded_json():
     token = re.compile(r"\d+(?:\.\d+)?")
     allowed = set(token.findall(METRICS_TEXT + CLEANING + SESSION))
-    allowed |= set(token.findall(json.dumps(_data())))
-    allowed |= {f"{w['yield_pct']:.2f}" for w in _data()["weeks"]}
+    d = _data()
+    # numbers the page derives from the sources (recomputed here, not read back from the page JSON)
+    derived = _independent_derived()
+    allowed |= {str(derived["earlier_lower_weeks"]), str(derived["earlier_min_runs"]), *map(str, derived["replay_weeks"])}
+    allowed |= {f"{100 * (w['runs'] - w['fails']) / w['runs']:.2f}" for w in d["weeks"]}
+    allowed |= {str(w["runs"]) for w in d["weeks"]} | {str(w["fails"]) for w in d["weeks"]}
+    allowed |= {str(int(w["week"].split("-W")[1])) for w in d["weeks"]} | {"34"}  # week labels; 34 is the fixed range start
     allowed |= {"10", "100", "90", "80", "75", "0.5", "4.0", "2008", "2026", "24", "5", "3", "2", "6", "1"}  # axis ticks, licence, list sizes
     text = _visible_text(PAGE)
     text = re.sub(r"https?://\S+", " ", text)
